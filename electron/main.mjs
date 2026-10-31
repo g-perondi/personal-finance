@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -103,6 +103,7 @@ async function createMainWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Personal Finance',
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -125,6 +126,7 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   void createMainWindow()
 
   app.on('activate', () => {
