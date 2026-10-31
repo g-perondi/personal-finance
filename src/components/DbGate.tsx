@@ -13,7 +13,7 @@ export function DbGate({ children }: DbGateProps) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 text-slate-200">
         <Loader2 className="size-10 animate-spin text-slate-400" aria-hidden />
-        <p className="text-sm text-slate-400">Caricamento del database locale…</p>
+        <p className="text-sm text-slate-400">Loading local database…</p>
       </div>
     )
   }
@@ -27,7 +27,7 @@ export function DbGate({ children }: DbGateProps) {
           className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
           onClick={retry}
         >
-          Riprova
+          Retry
         </button>
       </div>
     )

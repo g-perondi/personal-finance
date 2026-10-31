@@ -12,7 +12,7 @@ Browser-only personal finance SPA: multi-account tracking, transfers, categorize
 ## Conventions
 
 - **Code and git messages:** English
-- **User-facing UI:** Italian
+- **User-facing UI:** English
 - **Domain entity names:** always singular (`account`, `transaction`, `category`, …)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow (branch per change, merge to `main`), commit format, and code style.
@@ -40,7 +40,7 @@ npm run lint:fix      # Oxlint auto-fix where supported
 ```text
 src/
   components/   # Shared UI (AppShell, …)
-  pages/        # Route pages (Italian copy)
+  pages/        # Route pages (English UI)
   db/           # sql.js, migrations, repositories (Phase 1+)
   context/      # DbProvider (Phase 1+)
   lib/          # money, dates, savings helpers

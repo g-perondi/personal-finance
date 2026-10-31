@@ -12,11 +12,11 @@ function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<DashboardPage />} />
-        <Route path="movimenti" element={<TransactionPage />} />
-        <Route path="conti" element={<AccountPage />} />
-        <Route path="categorie" element={<CategoryPage />} />
-        <Route path="documenti" element={<DocumentPage />} />
-        <Route path="impostazioni" element={<SettingsPage />} />
+        <Route path="transactions" element={<TransactionPage />} />
+        <Route path="accounts" element={<AccountPage />} />
+        <Route path="categories" element={<CategoryPage />} />
+        <Route path="documents" element={<DocumentPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

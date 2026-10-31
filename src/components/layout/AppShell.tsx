@@ -15,11 +15,11 @@ const navItems: Array<{
   end?: boolean
 }> = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/movimenti', label: 'Movimenti', icon: ArrowLeftRight },
-  { to: '/conti', label: 'Conti', icon: Wallet },
-  { to: '/categorie', label: 'Categorie', icon: Tag },
-  { to: '/documenti', label: 'Documenti', icon: FolderOpen },
-  { to: '/impostazioni', label: 'Impostazioni', icon: Settings },
+  { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { to: '/accounts', label: 'Accounts', icon: Wallet },
+  { to: '/categories', label: 'Categories', icon: Tag },
+  { to: '/documents', label: 'Documents', icon: FolderOpen },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function navLinkClass(isActive: boolean): string {
@@ -38,7 +38,7 @@ export function AppShell() {
           <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
             Personal
           </p>
-          <h1 className="text-lg font-semibold text-white">Finanze</h1>
+          <h1 className="text-lg font-semibold text-white">Finance</h1>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
           {navItems.map(({ to, label, icon: Icon, end }) => (

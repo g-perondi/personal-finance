@@ -96,7 +96,7 @@ Install hooks after clone: `npm install` (runs `prepare` → Husky).
 ## Code conventions
 
 - **Code:** English identifiers, comments, and file names
-- **UI copy:** Italian
+- **UI copy:** English
 - **Domain entities:** singular names (`account`, `transaction`, `category`, …)
 - **Formatting:** Prettier is the source of truth (see `.prettierrc`)
 - **Lint:** Oxlint (see `.oxlintrc.json`)

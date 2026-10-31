@@ -4,7 +4,7 @@ export function DashboardPage() {
   return (
     <PlaceholderPage
       title="Dashboard"
-      description="Vista globale su tutti i conti: entrate, uscite, risparmio mensile e grafici."
+      description="Global view across all accounts: income, spending, monthly savings, and charts."
     />
   )
 }

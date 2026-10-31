@@ -3,8 +3,8 @@ import { PlaceholderPage } from '../components/PlaceholderPage'
 export function AccountPage() {
   return (
     <PlaceholderPage
-      title="Conti"
-      description="Gestisci i tuoi conti (Intesa, Trade Republic, Revolut, …) e i saldi."
+      title="Accounts"
+      description="Manage your accounts (e.g. Intesa, Trade Republic, Revolut) and balances."
     />
   )
 }
