@@ -15,7 +15,7 @@ Browser-only personal finance SPA: multi-account tracking, transfers, categorize
 - **User-facing UI:** Italian
 - **Domain entity names:** always singular (`account`, `transaction`, `category`, …)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow, commit format, and code style.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow (branch per change, merge to `main`), commit format, and code style.
 
 ## Scripts
 

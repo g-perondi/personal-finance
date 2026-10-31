@@ -2,11 +2,41 @@
 
 ## Git
 
-- Default branch: **`main`**
+- Default branch: **`main`** — integration branch; **do not commit directly on `main`**
+- Every change starts on a **topic branch** and merges into `main` when done
 - Commits follow **[Conventional Commits](https://www.conventionalcommits.org/)** in **English**
 - **`scope` is always required** (no empty scope). Repo-wide changes use scope **`global`**.
 
-### Format
+### Branches
+
+Use one of these prefixes, then a **short kebab-case** slug (include scope when it helps: `feat/db-account-schema`).
+
+| Prefix     | Purpose                                                   | Examples                                        |
+| ---------- | --------------------------------------------------------- | ----------------------------------------------- |
+| `feat/`    | New behavior or domain capability                         | `feat/db-init`, `feat/app-transfer-form`        |
+| `fix/`     | Bug fixes                                                 | `fix/ui-nav-active-state`                       |
+| `chore/`   | Tooling, deps, repo maintenance                           | `chore/global-prettier`, `chore/deps-bump-vite` |
+| `release/` | **Versioned** release line; merge to `main` when shipping | `release/0.1.0`, `release/1.0.0`                |
+
+**Release branches:** name `release/<semver>` (no `v` prefix). Use for stabilizing a version (final fixes, version bump in `package.json`, release notes). When ready, merge into `main` and tag `vX.Y.Z` on `main` if you use tags.
+
+**Workflow:**
+
+```bash
+git checkout main
+git pull   # when a remote exists
+git checkout -b feat/db-account-schema
+# … commits …
+git checkout main
+git merge feat/db-account-schema
+git branch -d feat/db-account-schema
+```
+
+Keep branches short-lived and aligned with one coherent task (same granularity as a single merge).
+
+### Commits
+
+### Commit format
 
 ```text
 <type>(<scope>): <subject>
