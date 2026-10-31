@@ -6,14 +6,14 @@ function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const message = error.message.toLowerCase()
     if (message.includes('indexeddb') || message.includes('idb')) {
-      return 'Impossibile accedere alla memoria locale del browser (IndexedDB).'
+      return 'Unable to access browser local storage (IndexedDB).'
     }
     if (message.includes('wasm') || message.includes('sql-wasm')) {
-      return 'Impossibile caricare il motore del database (WebAssembly).'
+      return 'Unable to load the database engine (WebAssembly).'
     }
-    return 'Errore durante l’inizializzazione del database locale.'
+    return `Failed to initialize the local database. ${error.message}`
   }
-  return 'Errore sconosciuto durante l’inizializzazione del database.'
+  return 'Unknown error while initializing the database.'
 }
 
 type DbProviderProps = {

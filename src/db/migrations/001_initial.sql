@@ -28,7 +28,7 @@ CREATE TABLE transfer (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE transaction (
+CREATE TABLE "transaction" (
   id TEXT PRIMARY KEY NOT NULL,
   account_id TEXT NOT NULL REFERENCES account (id),
   kind TEXT NOT NULL CHECK (
@@ -44,11 +44,11 @@ CREATE TABLE transaction (
   created_at TEXT NOT NULL
 );
 
-CREATE INDEX idx_transaction_account_id ON transaction (account_id);
+CREATE INDEX idx_transaction_account_id ON "transaction" (account_id);
 
-CREATE INDEX idx_transaction_transfer_id ON transaction (transfer_id);
+CREATE INDEX idx_transaction_transfer_id ON "transaction" (transfer_id);
 
-CREATE INDEX idx_transaction_date ON transaction (transaction_date);
+CREATE INDEX idx_transaction_date ON "transaction" (transaction_date);
 
 CREATE INDEX idx_transfer_from_account ON transfer (from_account_id);
 

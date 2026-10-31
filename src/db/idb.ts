@@ -70,3 +70,15 @@ export async function saveSnapshot(data: Uint8Array): Promise<void> {
     idb.close()
   }
 }
+
+export async function deleteSnapshot(): Promise<void> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    store.delete(SNAPSHOT_KEY)
+    await idbTransactionComplete(tx)
+  } finally {
+    idb.close()
+  }
+}

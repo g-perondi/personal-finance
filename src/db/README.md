@@ -21,7 +21,7 @@ Entities use **singular** table names. Amounts are **integer cents**. Primary ke
 - `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row)
 - `category` — user-defined; `type` is `income` or `expense`
 - `transfer` — header for money moved between two accounts
-- `transaction` — ledger lines on an account
+- `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word)
 
 Trade Republic is modeled as a **single account**: payments, remunerated cash, manual Saveback/PAC/ETF flows are **`transaction.kind = investment`** (or income/expense/transfer as appropriate), not a separate account type.
 
