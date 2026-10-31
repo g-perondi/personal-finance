@@ -5,9 +5,9 @@ Browser-only personal finance SPA: multi-account tracking, transfers, categorize
 ## Stack
 
 - React 19 + Vite 8 + TypeScript
-- Tailwind CSS 4 + Lucide icons
-- sql.js (WASM at `public/sql-wasm.wasm`) + IndexedDB persistence (Phase 1+)
-- Recharts, react-router-dom, date-fns, fflate (backup)
+- Tailwind CSS 4 + Lucide icons (`@fontsource/inconsolata`)
+- sql.js (WASM at `public/sql-wasm.wasm`) + IndexedDB persistence
+- Recharts, react-router-dom, date-fns, fflate (backup ZIP)
 
 ## Conventions
 
@@ -15,7 +15,7 @@ Browser-only personal finance SPA: multi-account tracking, transfers, categorize
 - **User-facing UI:** English
 - **Domain entity names:** always singular (`account`, `transaction`, `category`, …)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow (branch per change, merge to `main`), commit format, and code style.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow (branch per change, merge to `main`), commit format, and code style. Database behavior and schema notes: [`src/db/README.md`](src/db/README.md).
 
 ## Scripts
 
@@ -39,26 +39,31 @@ npm run lint:fix      # Oxlint auto-fix where supported
 
 ```text
 src/
-  components/   # Shared UI (AppShell, …)
-  pages/        # Route pages (English UI)
-  db/           # sql.js, migrations, repositories (Phase 1+)
-  context/      # DbProvider (Phase 1+)
-  lib/          # money, dates, savings helpers
+  components/   # Shared UI (AppShell, dashboard widgets, documents, …)
+  pages/        # Routes: dashboard, transactions, accounts, categories, documents
+  db/           # sql.js init, migrations, repositories, IndexedDB helpers
+  context/      # DbProvider
+  lib/          # money, dates, savings, backup ZIP, list search helpers
 public/
   sql-wasm.wasm # sql.js runtime
 ```
 
 ## Roadmap
 
-| Phase | Scope                                                                   |
-| ----- | ----------------------------------------------------------------------- |
-| 0     | Project scaffold and tooling (current)                                  |
-| 1     | Database layer + multi-account schema                                   |
-| 2     | Accounts, transactions, transfers                                       |
-| 3     | Recurrence on income, expense, investment + category defaults           |
-| 4     | Global dashboard (scope year/month/day), wealth charts, savings rate    |
-| 5+    | Documents (MVP), backup zip (sidebar); recurring rules and budget later |
+| Phase | Scope                                                                    | Status  |
+| ----- | ------------------------------------------------------------------------ | ------- |
+| 0     | Project scaffold and tooling                                             | Done    |
+| 1     | Database layer + multi-account schema                                    | Done    |
+| 2     | Accounts, transactions, transfers                                        | Done    |
+| 3     | Recurrence on income, expense, investment + category defaults            | Done    |
+| 4     | Global dashboard (year / month / day), wealth charts, savings rate       | Done    |
+| 5     | Documents (MVP), sidebar backup ZIP, list search, clear local data       | Done    |
+| 6+    | Recurring rules (scheduled generation), budget, richer investments / ETF | Planned |
+
+**Phase 5 (shipped):** document upload with tags and year filters; export/import backup (SQLite + document blobs); LIKE search on documents and transactions; **Clear all data** with typed confirmation in the sidebar.
+
+**Not planned (for now):** backend, auth, multi-currency, per-account dashboard pages.
 
 ## Data notice
 
-Data is stored only in this browser profile (IndexedDB). Use **Download backup** in the sidebar before clearing site data or switching browsers.
+Data lives only in this browser profile (IndexedDB: SQLite snapshot + document blobs). Use **Download backup** in the sidebar before clearing site data or switching browsers. **Restore backup** and **Clear all data** replace or wipe local data after confirmation — download a backup first if you need a copy.
