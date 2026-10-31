@@ -1,5 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { ArrowLeftRight, FolderOpen, LayoutDashboard, Tag, Wallet } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  FolderOpen,
+  LayoutDashboard,
+  Tag,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 import { SidebarBackupSection } from './SidebarBackupSection'
 
 const navItems: Array<{
@@ -10,6 +17,7 @@ const navItems: Array<{
 }> = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { to: '/investments', label: 'Investments', icon: TrendingUp },
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/documents', label: 'Documents', icon: FolderOpen },
   { to: '/accounts', label: 'Accounts', icon: Wallet },

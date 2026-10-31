@@ -106,6 +106,18 @@ Month-end / daily series use the same rules at each point in time.
 
 Repository: [`repositories/dashboard.ts`](repositories/dashboard.ts).
 
+## ETF holdings (migration 10)
+
+Portfolio positions are separate from the cash ledger: **`instrument`** (ISIN, Yahoo/API `quote_symbol`, name), **`holding`** (one row per account + ETF: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; optional `transaction_id` for buys that also post an **`investment`** transaction).
+
+- **Weighted average cost:** display avg = `total_cost_cents / quantity`; new buys add amount to cost and units from `amount_cents / price_cents_per_unit`.
+- **Opening seed:** `createOpeningHolding` — no ledger row; `transaction_id` NULL on the purchase row.
+- **New purchase:** `recordHoldingPurchase` — updates holding, inserts purchase, inserts matching **`transaction`** (`kind = investment`) on the same account/date/amount.
+- **Quotes:** [`src/lib/market-quotes/`](../lib/market-quotes/) fetches delayed/unofficial prices in the browser (CORS providers + SQLite **`instrument_quote_cache`**). Live fetch runs only when opening **`/investments`** or clicking **Refresh quotes**; the dashboard **Portfolio value** KPI uses cached prices from the last fetch.
+- **Wealth chart “Investment”** still reflects cumulative **`investment`** movements; market value KPI reflects holdings × last quote.
+
+Repositories: [`repositories/instrument.ts`](repositories/instrument.ts), [`repositories/holding.ts`](repositories/holding.ts).
+
 ## Documents
 
 Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction); file bytes in IndexedDB store **`document_blob`** (key = `document.id`). See [`document-blob.ts`](../document-blob.ts) and [`repositories/document.ts`](repositories/document.ts).

@@ -36,6 +36,7 @@ import {
 } from '../lib/savings'
 import { formatCents } from '../lib/money'
 import { useDatabase } from '../hooks/useDatabase'
+import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
 
 /** Cashflow (and any extra charts) wrap from row 2; row 1 is Wealth + Last movements. */
 function dashboardBelowRowGridClass(index: number): string {
@@ -47,6 +48,7 @@ function dashboardBelowRowGridClass(index: number): string {
 
 export function DashboardPage() {
   const db = useDatabase()
+  const portfolio = usePortfolioQuotes()
   const [scope, setScope] = useState<DashboardScope>('global')
   const [period, setPeriod] = useState<DashboardPeriod>(() => defaultDashboardPeriod())
 
@@ -175,6 +177,26 @@ export function DashboardPage() {
 
   const kpiItems = [
     { label: 'Total balance', value: formatCents(data.balanceAtPeriodEnd) },
+    ...(portfolio.holdings.length > 0
+      ? [
+          {
+            label: 'Portfolio value',
+            value:
+              portfolio.totals.marketValueCents === null
+                ? '—'
+                : formatCents(portfolio.totals.marketValueCents),
+            hint:
+              portfolio.totals.marketValueCents !== null &&
+              portfolio.totals.marketValueCents - portfolio.totals.costBasisCents !== 0
+                ? `Unrealized ${formatCents(
+                    portfolio.totals.marketValueCents - portfolio.totals.costBasisCents,
+                  )}${portfolio.stale ? ' · stale quotes' : ''}`
+                : portfolio.stale
+                  ? 'Stale quotes'
+                  : undefined,
+          },
+        ]
+      : []),
     { label: 'Income', value: formatCents(data.totals.incomeCents) },
     { label: 'Expenses', value: formatCents(data.totals.expenseCents) },
     { label: 'Investments', value: formatCents(data.totals.investmentCents) },

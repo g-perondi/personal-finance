@@ -40,7 +40,7 @@ npm run lint:fix      # Oxlint auto-fix where supported
 ```text
 src/
   components/   # Shared UI (AppShell, dashboard widgets, documents, …)
-  pages/        # Routes: dashboard, transactions, accounts, categories, documents
+  pages/        # Routes: dashboard, transactions, investments, accounts, categories, documents
   db/           # sql.js init, migrations, repositories, IndexedDB helpers
   context/      # DbProvider
   lib/          # money, dates, savings, backup ZIP, list search helpers
@@ -50,15 +50,18 @@ public/
 
 ## Roadmap
 
-| Phase | Scope                                                                    | Status  |
-| ----- | ------------------------------------------------------------------------ | ------- |
-| 0     | Project scaffold and tooling                                             | Done    |
-| 1     | Database layer + multi-account schema                                    | Done    |
-| 2     | Accounts, transactions, transfers                                        | Done    |
-| 3     | Recurrence on income, expense, investment + category defaults            | Done    |
-| 4     | Global dashboard (year / month / day), wealth charts, savings rate       | Done    |
-| 5     | Documents (MVP), sidebar backup ZIP, list search, clear local data       | Done    |
-| 6+    | Recurring rules (scheduled generation), budget, richer investments / ETF | Planned |
+| Phase | Scope                                                                       | Status  |
+| ----- | --------------------------------------------------------------------------- | ------- |
+| 0     | Project scaffold and tooling                                                | Done    |
+| 1     | Database layer + multi-account schema                                       | Done    |
+| 2     | Accounts, transactions, transfers                                           | Done    |
+| 3     | Recurrence on income, expense, investment + category defaults               | Done    |
+| 4     | Global dashboard (year / month / day), wealth charts, savings rate          | Done    |
+| 5     | Documents (MVP), sidebar backup ZIP, list search, clear local data          | Done    |
+| 6     | ETF portfolio (holdings, WAC, live quotes without API key), `/investments`  | Done    |
+| 6+    | Recurring rules (scheduled generation), budget, sales / richer broker tools | Planned |
+
+**Phase 6 (shipped):** `/investments` — ETF holdings with weighted average cost, opening positions and purchases (amount + NAV → units), linked `investment` ledger rows on buy, delayed third-party quotes fetched when you open Investments or click **Refresh quotes** (dashboard shows last cached prices only; no API key).
 
 **Phase 5 (shipped):** document upload with tags and year filters; export/import backup (SQLite + document blobs); LIKE search on documents and transactions; **Clear all data** with typed confirmation in the sidebar.
 

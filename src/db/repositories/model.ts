@@ -83,3 +83,43 @@ export type DocumentRecord = {
 export type DocumentListItem = DocumentRecord & {
   tags: DocumentTagSummary[]
 }
+
+export type InstrumentRecord = {
+  id: string
+  isin: string | null
+  quoteSymbol: string
+  name: string
+  createdAt: UtcIsoString
+}
+
+export type HoldingRecord = {
+  id: string
+  accountId: string
+  instrumentId: string
+  quantity: number
+  totalCostCents: number
+  updatedAt: UtcIsoString
+}
+
+export type HoldingListItem = HoldingRecord & {
+  instrumentName: string
+  instrumentIsin: string | null
+  quoteSymbol: string
+  accountName: string
+}
+
+export type HoldingPurchaseRecord = {
+  id: string
+  holdingId: string
+  transactionId: string | null
+  purchaseDate: UtcIsoString
+  amountCents: number
+  priceCentsPerUnit: number
+  quantity: number
+  createdAt: UtcIsoString
+}
+
+export type HoldingPurchaseListItem = HoldingPurchaseRecord & {
+  instrumentName: string
+  accountName: string
+}
