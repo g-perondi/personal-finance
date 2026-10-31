@@ -11,7 +11,9 @@ export type AccountRecord = {
   name: string
   openingBalanceCents: number
   note: string | null
-  /** UTC ISO 8601 */
+  /** Start of opening calendar day in Europe/Rome (UTC ISO). */
+  openedAt: UtcIsoString
+  /** UTC ISO 8601 when the row was created in the app */
   createdAt: UtcIsoString
   /** UTC ISO 8601 when archived */
   archivedAt: UtcIsoString | null
@@ -19,6 +21,10 @@ export type AccountRecord = {
 
 export type AccountWithBalance = AccountRecord & {
   balanceCents: number
+  /** Mean end-of-day balance for elapsed days in the Rome calendar year (accounts list only). */
+  averageDailyBalanceYtdCents?: number
+  /** Sum of investment movements in the Rome calendar year (accounts list only). */
+  investedYtdCents?: number
 }
 
 export type CategoryRecord = {

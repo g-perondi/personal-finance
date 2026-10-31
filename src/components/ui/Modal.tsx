@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { X } from 'lucide-react'
 
 type ModalProps = {
   title: string
@@ -31,10 +32,11 @@ export function Modal({ title, open, onClose, children }: ModalProps) {
           </h3>
           <button
             type="button"
-            className="rounded-lg px-2 py-1 text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+            aria-label="Close"
             onClick={onClose}
           >
-            Close
+            <X className="size-5" aria-hidden />
           </button>
         </div>
         {children}

@@ -92,13 +92,7 @@ export function CategoryPage() {
   return (
     <div className="flex flex-1 flex-col p-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-white">Categories</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Label income and expenses. Default recurrence also prefills investment
-            entries (e.g. PAC).
-          </p>
-        </div>
+        <h2 className="text-2xl font-semibold text-white">Categories</h2>
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white"
@@ -133,7 +127,7 @@ export function CategoryPage() {
           {categories.map((category) => (
             <li
               key={category.id}
-              className="flex items-center justify-between gap-4 px-4 py-3 text-sm text-slate-200"
+              className="data-table-row flex items-center justify-between gap-4 px-4 py-3 text-sm text-slate-200"
             >
               <div>
                 <span className="font-medium text-white">{category.name}</span>

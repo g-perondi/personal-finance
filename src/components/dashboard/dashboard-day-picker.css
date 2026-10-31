@@ -1,0 +1,43 @@
+.dashboard-day-picker {
+  --rdp-accent-color: rgb(15 23 42);
+  --rdp-accent-background-color: rgb(241 245 249);
+  --rdp-background-color: rgb(15 23 42);
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  color: rgb(226 232 240);
+}
+
+.dashboard-day-picker .rdp-root {
+  background: transparent;
+}
+
+.dashboard-day-picker .rdp-chevron {
+  fill: rgb(148 163 184);
+}
+
+.dashboard-day-picker .rdp-button_next,
+.dashboard-day-picker .rdp-button_previous {
+  color: rgb(148 163 184);
+}
+
+.dashboard-day-picker .rdp-button_next:hover,
+.dashboard-day-picker .rdp-button_previous:hover {
+  background-color: rgb(30 41 59);
+  color: rgb(241 245 249);
+}
+
+.dashboard-day-picker .rdp-day_button:hover:not([disabled]) {
+  background-color: rgb(30 41 59);
+}
+
+.dashboard-day-picker .rdp-selected .rdp-day_button {
+  background-color: rgb(241 245 249);
+  color: rgb(15 23 42);
+  font-weight: 600;
+}
+
+.dashboard-day-picker .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: rgb(125 211 252);
+}

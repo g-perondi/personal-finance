@@ -16,9 +16,9 @@ const navItems: Array<{
 }> = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/documents', label: 'Documents', icon: FolderOpen },
+  { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

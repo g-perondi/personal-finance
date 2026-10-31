@@ -59,6 +59,8 @@ const LIST_SELECT = `
 export type ListTransactionsOptions = {
   accountId?: string
   kind?: TransactionKind
+  startUtc?: string
+  endUtcExclusive?: string
   limit?: number
 }
 
@@ -76,6 +78,14 @@ export function listTransactions(
   if (options.kind) {
     clauses.push('t.kind = ?')
     params.push(options.kind)
+  }
+  if (options.startUtc) {
+    clauses.push('t.transaction_date >= ?')
+    params.push(options.startUtc)
+  }
+  if (options.endUtcExclusive) {
+    clauses.push('t.transaction_date < ?')
+    params.push(options.endUtcExclusive)
   }
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''

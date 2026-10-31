@@ -2,12 +2,14 @@ import type { Database } from 'sql.js'
 import initialSql from './001_initial.sql?raw'
 import accountArchivedSql from './002_account_archived.sql?raw'
 import recurrenceKindSql from './003_recurrence_kind.sql?raw'
+import accountOpenedAtSql from './004_account_opened_at.sql?raw'
 import { utcNowIso } from '../../lib/datetime'
 
 const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 1, sql: initialSql },
   { version: 2, sql: accountArchivedSql },
   { version: 3, sql: recurrenceKindSql },
+  { version: 4, sql: accountOpenedAtSql },
 ]
 
 function tableExists(db: Database, tableName: string): boolean {

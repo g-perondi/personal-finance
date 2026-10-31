@@ -22,3 +22,88 @@ select,
 [role='button'] {
   cursor: pointer;
 }
+
+/** Wealth row-1 card height (border + padding + title + chart area h-56). */
+.dashboard-row1-panel-h {
+  box-sizing: border-box;
+  height: calc(2px + 2rem + 1.25rem + 1rem + 14rem);
+  min-height: 0;
+}
+
+/** Table cells and compact slots for EUR amounts (~1/8 of row width). */
+.money-cell {
+  width: 12.5%;
+  max-width: 12.5%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.accounts-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.accounts-table col {
+  width: calc(100% / 6);
+}
+
+.accounts-table :is(th, td) {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.accounts-table th {
+  font-weight: 500;
+}
+
+.accounts-table .money-cell {
+  width: calc(100% / 6);
+  max-width: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.transactions-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.transactions-table col {
+  width: calc(100% / 8);
+}
+
+.transactions-table :is(th, td) {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.transactions-table th {
+  font-weight: 500;
+}
+
+.transactions-table .money-cell {
+  width: calc(100% / 8);
+  max-width: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/** List rows outside `<table>` (categories, ledger). */
+.data-table-row {
+  transition: background-color 120ms ease;
+}
+
+.data-table-row:hover {
+  background-color: rgb(30 41 59 / 0.55);
+}
+
+.data-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: rgb(30 41 59 / 0.55);
+}
