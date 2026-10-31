@@ -2,6 +2,16 @@
 
 SQLite via [sql.js](https://github.com/sql-js/sql.js) in the browser. The binary snapshot is persisted in **IndexedDB** (`personal-finance` / store `database` / key `sqlite`).
 
+## Date and time
+
+All persisted timestamps are **UTC ISO 8601** strings (`…Z`). Application code uses `src/lib/datetime.ts`:
+
+- **Audit fields** (`created_at`, `archived_at`, `schema_migration.applied_at`): `utcNowIso()` on write; format with `formatDateTimeInRome()` in UI when needed.
+- **Business calendar dates** (`transaction_date`, `transfer_date`): stored as UTC instants representing **start of that calendar day in `Europe/Rome`**. Forms use `<input type="date">` via `utcIsoToRomeDateInputValue()` / `todayRomeDateInputValue()`; lists use `formatCalendarDateInRome()`.
+- Legacy rows with bare `YYYY-MM-DD` are normalized on read to Rome-midnight UTC.
+
+There is no timezone picker; display always uses **Europe/Rome**.
+
 ## Layout
 
 | Module        | Role                                                     |
@@ -18,7 +28,7 @@ Repositories (Phase 2+) will live under `repositories/` and call `getDatabase()`
 Entities use **singular** table names. Amounts are **integer cents**. Primary keys are **TEXT UUIDs** (generated in application code later).
 
 - `schema_migration` — applied migration versions
-- `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row)
+- `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row); `archived_at` set when archived (migration 2)
 - `category` — user-defined; `type` is `income` or `expense`
 - `transfer` — header for money moved between two accounts
 - `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word)

@@ -1,7 +1,12 @@
 import type { Database } from 'sql.js'
 import initialSql from './001_initial.sql?raw'
+import accountArchivedSql from './002_account_archived.sql?raw'
+import { utcNowIso } from '../../lib/datetime'
 
-const MIGRATIONS: { version: number; sql: string }[] = [{ version: 1, sql: initialSql }]
+const MIGRATIONS: { version: number; sql: string }[] = [
+  { version: 1, sql: initialSql },
+  { version: 2, sql: accountArchivedSql },
+]
 
 function tableExists(db: Database, tableName: string): boolean {
   const stmt = db.prepare(
@@ -45,7 +50,7 @@ export function runMigrations(db: Database, onMutate: () => void): void {
     db.exec(migration.sql)
     db.run('INSERT INTO schema_migration (version, applied_at) VALUES (?, ?)', [
       migration.version,
-      new Date().toISOString(),
+      utcNowIso(),
     ])
   }
 
