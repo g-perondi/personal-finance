@@ -161,6 +161,20 @@ Full export is a **ZIP** (`formatVersion` 1) built in [`src/lib/backup.ts`](../l
 
 UI: sidebar footer **Download backup** / **Restore backup** / **Clear all data** (English). Restore and clear are destructive — confirm in a modal before proceeding.
 
+### Backward compatibility (required)
+
+**Every new version of the app must remain able to import data exported by older versions.**
+
+This applies to:
+
+1. **Backup ZIP** (`manifest.formatVersion` in [`backup.ts`](../lib/backup.ts)) — if you introduce a new format version, **restore must still accept every previous `formatVersion`** (implement explicit branches or adapters; do not drop support without a documented migration tool).
+2. **SQLite inside the ZIP** — after restore, `runMigrations()` upgrades older `schema_version` snapshots forward. **Migrations must be additive and safe** for data created under prior schema versions (no silent data loss).
+3. **Document blobs** — IDs referenced in SQLite must keep matching `blobs/{id}` entries; do not rename blob layout without import support for the old layout.
+
+Treat a user’s backup file as a long-lived contract: browser, Electron, and future channels all share the same export format.
+
 ## Migrations
 
 `runMigrations()` reads `MAX(version)` from `schema_migration` and applies SQL files with higher version numbers, then records the version and triggers a debounced IndexedDB persist (~400 ms).
+
+When authoring a new migration, assume users may **restore a backup** from an older build: migrated data must remain readable and semantically consistent with pre-migration exports (see **Backward compatibility** under Backup).

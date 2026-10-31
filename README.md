@@ -30,6 +30,22 @@ npm run lint          # Oxlint
 npm run lint:fix      # Oxlint auto-fix where supported
 ```
 
+### Desktop (Electron, Windows)
+
+Packaged app for daily use on your PC (no Node server while using the app). Data stays local in the app’s Chromium profile (IndexedDB), separate from Chrome/Edge.
+
+**Prerequisites:** Node.js for building only.
+
+```bash
+npm run electron:dev     # Vite + Electron window (http://localhost:5173)
+npm run build:electron   # Frontend build with relative asset paths (./)
+npm run electron:build   # build:electron + Windows portable .exe under release/
+```
+
+**Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app.
+
+**After code changes:** run `npm run electron:build` and replace the shortcut or portable exe in `release/`.
+
 ## Code style
 
 - Prettier + `prettier-plugin-tailwindcss`, Oxlint (React/TS), EditorConfig
@@ -46,6 +62,9 @@ src/
   lib/          # money, dates, savings, backup ZIP, list search helpers
 public/
   sql-wasm.wasm # sql.js runtime
+electron/
+  main.mjs      # Electron main process (dev URL + prod static server)
+  preload.mjs   # contextBridge (desktop flag only)
 ```
 
 ## Roadmap
@@ -73,3 +92,5 @@ public/
 ## Data notice
 
 Data lives only in this browser profile (IndexedDB: SQLite snapshot + document blobs). Use **Download backup** in the sidebar before clearing site data or switching browsers. **Restore backup** and **Clear all data** replace or wipe local data after confirmation — download a backup first if you need a copy.
+
+**Compatibility:** newer app versions must still **restore backup ZIP files** created by older versions (see [`src/db/README.md`](src/db/README.md)).

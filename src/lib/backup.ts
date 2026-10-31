@@ -10,6 +10,7 @@ import { getCurrentSchemaVersion } from '../db/migrations'
 import { utcNowIso } from './datetime'
 
 export const BACKUP_FORMAT_VERSION = 1
+/** Current export format. Import must accept this and every earlier formatVersion (see src/db/README.md). */
 const MANIFEST_PATH = 'manifest.json'
 const SQLITE_PATH = 'sqlite.db'
 const BLOB_PREFIX = 'blobs/'

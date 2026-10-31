@@ -98,6 +98,7 @@ Install hooks after clone: `npm install` (runs `prepare` → Husky).
 - **Code:** English identifiers, comments, and file names
 - **UI copy:** English
 - **Domain entities:** singular names (`account`, `transaction`, `category`, …)
+- **Data exports:** backup ZIP restore must stay **backward compatible** with exports from all prior releases; see [`src/db/README.md`](src/db/README.md) (Backup → Backward compatibility)
 - **Formatting:** Prettier is the source of truth (see `.prettierrc`)
 - **Lint:** Oxlint (see `.oxlintrc.json`)
 

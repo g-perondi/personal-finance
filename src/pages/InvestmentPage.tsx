@@ -421,7 +421,7 @@ export function InvestmentPage() {
       ) : null}
 
       <div className="app-page-scroll-ceiling">
-        <table className="w-full min-w-[960px] text-left text-sm">
+        <table className="w-full min-w-240 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-950 text-xs text-slate-400 uppercase">
             <tr>
               <th className="px-3 py-2 font-medium">Instrument</th>
@@ -526,7 +526,7 @@ export function InvestmentPage() {
       <section className="mt-10">
         <h3 className="mb-3 text-lg font-semibold text-white">Recent purchases</h3>
         <div className="overflow-x-auto rounded-xl border border-slate-800">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-160 text-left text-sm">
             <thead className="bg-slate-900/80 text-xs text-slate-400 uppercase">
               <tr>
                 <th className="px-3 py-2 font-medium">Date</th>
