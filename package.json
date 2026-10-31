@@ -7,7 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "lint:fix": "oxlint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "preview": "vite preview",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "oxlint --fix"
+    ],
+    "*.{js,mjs,cjs,json,css,html,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "date-fns": "^4.4.0",
@@ -20,13 +33,19 @@
     "sql.js": "^1.15.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^6.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "oxlint": "^1.89.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"

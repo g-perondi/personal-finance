@@ -15,7 +15,7 @@ Browser-only personal finance SPA: multi-account tracking, transfers, categorize
 - **User-facing UI:** Italian
 - **Domain entity names:** always singular (`account`, `transaction`, `category`, …)
 
-See [`.cursor/rules/personal-finance.mdc`](.cursor/rules/personal-finance.mdc) and [`.cursor/docs/VERSIONS.md`](.cursor/docs/VERSIONS.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for git workflow, commit format, and code style.
 
 ## Scripts
 
@@ -24,7 +24,16 @@ npm install
 npm run dev
 npm run build
 npm run preview
+npm run format        # Prettier write (run after each task)
+npm run format:check  # CI-style format check
+npm run lint          # Oxlint
+npm run lint:fix      # Oxlint auto-fix where supported
 ```
+
+## Code style
+
+- Prettier + `prettier-plugin-tailwindcss`, Oxlint (React/TS), EditorConfig
+- Recommended extensions in `.vscode/extensions.json`, format on save in `.vscode/settings.json`
 
 ## Project layout
 
@@ -41,14 +50,14 @@ public/
 
 ## Roadmap
 
-| Phase | Scope |
-|-------|--------|
-| 0 | Scaffold, Cursor rules, framework docs snapshot (current) |
-| 1 | Database layer + multi-account schema |
-| 2 | Accounts, transactions, transfers |
-| 3 | Categories, recurring vs variable expenses |
-| 4 | Global dashboard + monthly savings rate |
-| 5+ | Recurring rules, budget, investments, documents, backup |
+| Phase | Scope                                                   |
+| ----- | ------------------------------------------------------- |
+| 0     | Project scaffold and tooling (current)                  |
+| 1     | Database layer + multi-account schema                   |
+| 2     | Accounts, transactions, transfers                       |
+| 3     | Categories, recurring vs variable expenses              |
+| 4     | Global dashboard + monthly savings rate                 |
+| 5+    | Recurring rules, budget, investments, documents, backup |
 
 ## Data notice
 

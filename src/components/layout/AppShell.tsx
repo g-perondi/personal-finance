@@ -35,7 +35,7 @@ export function AppShell() {
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900 px-4 py-6">
         <div className="mb-8 px-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
             Personal
           </p>
           <h1 className="text-lg font-semibold text-white">Finanze</h1>

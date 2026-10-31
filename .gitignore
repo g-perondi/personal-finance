@@ -12,9 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local editor/agent config (not part of the product repo)
+.cursor
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
