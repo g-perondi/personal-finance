@@ -12,8 +12,13 @@ export type TransferLeg = (typeof TRANSFER_LEGS)[number]
 export const CATEGORY_TYPES = ['income', 'expense'] as const
 export type CategoryType = (typeof CATEGORY_TYPES)[number]
 
-export const EXPENSE_KINDS = ['recurring', 'variable'] as const
-export type ExpenseKind = (typeof EXPENSE_KINDS)[number]
+export const RECURRENCE_KINDS = ['recurring', 'variable'] as const
+export type RecurrenceKind = (typeof RECURRENCE_KINDS)[number]
+
+/** @deprecated Use RECURRENCE_KINDS */
+export const EXPENSE_KINDS = RECURRENCE_KINDS
+/** @deprecated Use RecurrenceKind */
+export type ExpenseKind = RecurrenceKind
 
 /** Signed cents delta for balance: opening_balance_cents + sum(deltas). */
 export function signedAmountCents(

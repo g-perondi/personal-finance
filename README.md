@@ -50,14 +50,14 @@ public/
 
 ## Roadmap
 
-| Phase | Scope                                                   |
-| ----- | ------------------------------------------------------- |
-| 0     | Project scaffold and tooling (current)                  |
-| 1     | Database layer + multi-account schema                   |
-| 2     | Accounts, transactions, transfers                       |
-| 3     | Categories, recurring vs variable expenses              |
-| 4     | Global dashboard + monthly savings rate                 |
-| 5+    | Recurring rules, budget, investments, documents, backup |
+| Phase | Scope                                                         |
+| ----- | ------------------------------------------------------------- |
+| 0     | Project scaffold and tooling (current)                        |
+| 1     | Database layer + multi-account schema                         |
+| 2     | Accounts, transactions, transfers                             |
+| 3     | Recurrence on income, expense, investment + category defaults |
+| 4     | Global dashboard + monthly savings rate                       |
+| 5+    | Recurring rules, budget, investments, documents, backup       |
 
 ## Data notice
 

@@ -15,7 +15,8 @@ import {
   deleteTransfer,
   updateTransfer,
 } from '../db/repositories/transfer'
-import type { TransactionKind } from '../db/types'
+import { recurrenceKindLabel } from '../db/recurrence'
+import type { RecurrenceKind, TransactionKind } from '../db/types'
 import { useDatabase } from '../hooks/useDatabase'
 import {
   formatCalendarDateInRome,
@@ -35,6 +36,11 @@ type FormState = {
   date: string
   description: string
   categoryId: string
+  recurrenceKind: RecurrenceKind | ''
+}
+
+function entryKindNeedsRecurrence(kind: EntryKind): boolean {
+  return kind === 'income' || kind === 'expense' || kind === 'investment'
 }
 
 const emptyForm = (): FormState => ({
@@ -46,7 +52,31 @@ const emptyForm = (): FormState => ({
   date: todayRomeDateInputValue(),
   description: '',
   categoryId: '',
+  recurrenceKind: 'variable',
 })
+
+function addEntryModalTitle(
+  editingTxId: string | null,
+  editingTransferId: string | null,
+  kind: EntryKind,
+): string {
+  if (editingTxId || editingTransferId) {
+    return 'Edit entry'
+  }
+  if (kind === 'expense') {
+    return 'Add expense'
+  }
+  if (kind === 'income') {
+    return 'Add income'
+  }
+  if (kind === 'investment') {
+    return 'Add investment'
+  }
+  if (kind === 'transfer') {
+    return 'Add transfer'
+  }
+  return 'Add entry'
+}
 
 function kindLabel(
   kind: TransactionKind,
@@ -82,15 +112,19 @@ export function TransactionPage() {
 
   const bump = useCallback(() => setRefreshKey((k) => k + 1), [])
 
-  function openCreate() {
+  function openCreate(kind: EntryKind) {
     setEditingTransferId(null)
     setEditingTxId(null)
     const firstAccount = accounts[0]?.id ?? ''
+    const secondAccount =
+      accounts.find((account) => account.id !== firstAccount)?.id ?? ''
     setForm({
       ...emptyForm(),
-      accountId: firstAccount,
+      kind,
+      accountId: kind === 'transfer' ? '' : firstAccount,
       fromAccountId: firstAccount,
-      toAccountId: '',
+      toAccountId: kind === 'transfer' ? secondAccount : '',
+      recurrenceKind: entryKindNeedsRecurrence(kind) ? 'variable' : '',
     })
     setError(null)
     setModalOpen(true)
@@ -111,6 +145,7 @@ export function TransactionPage() {
       date: utcIsoToRomeDateInputValue(tx.transactionDate),
       description: tx.description ?? '',
       categoryId: tx.categoryId ?? '',
+      recurrenceKind: tx.recurrenceKind ?? '',
     })
     setError(null)
     setModalOpen(true)
@@ -137,6 +172,7 @@ export function TransactionPage() {
       date: utcIsoToRomeDateInputValue(outLeg.transactionDate),
       description: outLeg.description ?? '',
       categoryId: '',
+      recurrenceKind: '',
     })
     setError(null)
     setModalOpen(true)
@@ -197,6 +233,10 @@ export function TransactionPage() {
           setError('Select an account.')
           return
         }
+        if (entryKindNeedsRecurrence(form.kind) && !form.recurrenceKind) {
+          setError('Select recurrence (recurring or variable).')
+          return
+        }
         const payload = {
           accountId: form.accountId,
           kind: form.kind,
@@ -204,6 +244,7 @@ export function TransactionPage() {
           transactionDate: form.date,
           description: form.description,
           categoryId: form.categoryId || null,
+          recurrenceKind: form.recurrenceKind || null,
         }
         if (editingTxId) {
           updateSimpleTransaction(db, editingTxId, payload)
@@ -237,15 +278,44 @@ export function TransactionPage() {
             Income, expenses, investments, and transfers between accounts.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={accounts.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white disabled:opacity-50"
-          onClick={openCreate}
-        >
-          <Plus className="size-4" aria-hidden />
-          Add entry
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={accounts.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white disabled:opacity-50"
+            onClick={() => openCreate('expense')}
+          >
+            <Plus className="size-4" aria-hidden />
+            Add expense
+          </button>
+          <button
+            type="button"
+            disabled={accounts.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 hover:border-slate-500 hover:bg-slate-800 disabled:opacity-50"
+            onClick={() => openCreate('income')}
+          >
+            <Plus className="size-4" aria-hidden />
+            Add income
+          </button>
+          <button
+            type="button"
+            disabled={accounts.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 hover:border-slate-500 hover:bg-slate-800 disabled:opacity-50"
+            onClick={() => openCreate('investment')}
+          >
+            <Plus className="size-4" aria-hidden />
+            Add investment
+          </button>
+          <button
+            type="button"
+            disabled={accounts.length < 2}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 hover:border-slate-500 hover:bg-slate-800 disabled:opacity-50"
+            onClick={() => openCreate('transfer')}
+          >
+            <Plus className="size-4" aria-hidden />
+            Add transfer
+          </button>
+        </div>
       </header>
 
       {accounts.length === 0 ? (
@@ -266,6 +336,7 @@ export function TransactionPage() {
                 <th className="px-4 py-3 font-medium">Account</th>
                 <th className="px-4 py-3 font-medium">Amount</th>
                 <th className="px-4 py-3 font-medium">Category</th>
+                <th className="px-4 py-3 font-medium">Recurrence</th>
                 <th className="px-4 py-3 font-medium">Description</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -282,6 +353,9 @@ export function TransactionPage() {
                   <td className="px-4 py-3">{tx.accountName}</td>
                   <td className="px-4 py-3">{formatCents(tx.amountCents)}</td>
                   <td className="px-4 py-3 text-slate-400">{tx.categoryName ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-400">
+                    {recurrenceKindLabel(tx.recurrenceKind)}
+                  </td>
                   <td className="max-w-xs truncate px-4 py-3 text-slate-400">
                     {tx.description ?? '—'}
                   </td>
@@ -313,7 +387,7 @@ export function TransactionPage() {
       )}
 
       <Modal
-        title={editingTxId || editingTransferId ? 'Edit entry' : 'Add entry'}
+        title={addEntryModalTitle(editingTxId, editingTransferId, form.kind)}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
       >
@@ -323,9 +397,16 @@ export function TransactionPage() {
             <select
               value={form.kind}
               disabled={editingTxId !== null || editingTransferId !== null}
-              onChange={(event) =>
-                setForm({ ...form, kind: event.target.value as EntryKind })
-              }
+              onChange={(event) => {
+                const kind = event.target.value as EntryKind
+                setForm({
+                  ...form,
+                  kind,
+                  recurrenceKind: entryKindNeedsRecurrence(kind)
+                    ? form.recurrenceKind || 'variable'
+                    : '',
+                })
+              }}
               className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white disabled:opacity-50"
             >
               <option value="expense">Expense</option>
@@ -416,14 +497,43 @@ export function TransactionPage() {
             />
           </label>
 
+          {entryKindNeedsRecurrence(form.kind) ? (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-slate-300">Recurrence</span>
+              <select
+                required
+                value={form.recurrenceKind}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    recurrenceKind: event.target.value as RecurrenceKind,
+                  })
+                }
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              >
+                <option value="">Select…</option>
+                <option value="recurring">Recurring</option>
+                <option value="variable">Variable</option>
+              </select>
+            </label>
+          ) : null}
+
           {form.kind !== 'transfer' ? (
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-300">Category (optional)</span>
               <select
                 value={form.categoryId}
-                onChange={(event) =>
-                  setForm({ ...form, categoryId: event.target.value })
-                }
+                onChange={(event) => {
+                  const categoryId = event.target.value
+                  const category = categories.find((row) => row.id === categoryId)
+                  setForm((current) => ({
+                    ...current,
+                    categoryId,
+                    recurrenceKind:
+                      (category?.defaultRecurrenceKind ?? current.recurrenceKind) ||
+                      'variable',
+                  }))
+                }}
                 className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
               >
                 <option value="">None</option>

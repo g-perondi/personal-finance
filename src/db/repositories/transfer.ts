@@ -64,7 +64,7 @@ export function createTransfer(
     db.run(
       `INSERT INTO ${TRANSACTION_TABLE} (
         id, account_id, kind, amount_cents, transfer_leg, transfer_id,
-        category_id, expense_kind, transaction_date, description, created_at
+        category_id, recurrence_kind, transaction_date, description, created_at
       ) VALUES (?, ?, 'transfer', ?, 'out', ?, NULL, NULL, ?, ?, ?)`,
       [
         outTxId,
@@ -80,7 +80,7 @@ export function createTransfer(
     db.run(
       `INSERT INTO ${TRANSACTION_TABLE} (
         id, account_id, kind, amount_cents, transfer_leg, transfer_id,
-        category_id, expense_kind, transaction_date, description, created_at
+        category_id, recurrence_kind, transaction_date, description, created_at
       ) VALUES (?, ?, 'transfer', ?, 'in', ?, NULL, NULL, ?, ?, ?)`,
       [
         inTxId,

@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js'
-import type { TransactionKind } from '../types'
+import type { RecurrenceKind, TransactionKind } from '../types'
+import { recurrenceKindForTransactionKind } from '../recurrence'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
 import {
@@ -11,6 +12,14 @@ import {
 import type { TransactionListItem, TransactionRecord } from './model'
 import { TRANSACTION_TABLE } from './sql'
 
+function mapRecurrenceKind(row: Record<string, unknown>): RecurrenceKind | null {
+  const raw = row.recurrence_kind ?? row.expense_kind
+  if (raw === 'recurring' || raw === 'variable') {
+    return raw
+  }
+  return null
+}
+
 function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
   return {
     id: String(row.id),
@@ -20,7 +29,7 @@ function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
     transferLeg: row.transfer_leg == null ? null : (row.transfer_leg as 'in' | 'out'),
     transferId: row.transfer_id == null ? null : String(row.transfer_id),
     categoryId: row.category_id == null ? null : String(row.category_id),
-    expenseKind: null,
+    recurrenceKind: mapRecurrenceKind(row),
     transactionDate: normalizeStoredCalendarUtc(String(row.transaction_date)),
     description: row.description == null ? null : String(row.description),
     createdAt: toUtcIsoString(String(row.created_at)),
@@ -36,7 +45,7 @@ const LIST_SELECT = `
     t.transfer_leg,
     t.transfer_id,
     t.category_id,
-    t.expense_kind,
+    t.recurrence_kind,
     t.transaction_date,
     t.description,
     t.created_at,
@@ -108,6 +117,7 @@ export type SimpleTransactionInput = {
   transactionDate: string
   description?: string | null
   categoryId?: string | null
+  recurrenceKind?: RecurrenceKind | null
 }
 
 export function createSimpleTransaction(
@@ -120,17 +130,22 @@ export function createSimpleTransaction(
   const id = newId()
   const createdAt = utcNowIso()
   const transactionDate = parseCalendarDateForStorage(input.transactionDate)
+  const recurrenceKind = recurrenceKindForTransactionKind(
+    input.kind,
+    input.recurrenceKind,
+  )
   db.run(
     `INSERT INTO ${TRANSACTION_TABLE} (
       id, account_id, kind, amount_cents, transfer_leg, transfer_id,
-      category_id, expense_kind, transaction_date, description, created_at
-    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)`,
+      category_id, recurrence_kind, transaction_date, description, created_at
+    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`,
     [
       id,
       input.accountId,
       input.kind,
       input.amountCents,
       input.categoryId ?? null,
+      recurrenceKind,
       transactionDate,
       input.description?.trim() || null,
       createdAt,
@@ -155,16 +170,21 @@ export function updateSimpleTransaction(
     throw new Error('Amount must be greater than zero.')
   }
   const transactionDate = parseCalendarDateForStorage(input.transactionDate)
+  const recurrenceKind = recurrenceKindForTransactionKind(
+    input.kind,
+    input.recurrenceKind,
+  )
   db.run(
     `UPDATE ${TRANSACTION_TABLE}
      SET account_id = ?, kind = ?, amount_cents = ?, category_id = ?,
-         transaction_date = ?, description = ?
+         recurrence_kind = ?, transaction_date = ?, description = ?
      WHERE id = ?`,
     [
       input.accountId,
       input.kind,
       input.amountCents,
       input.categoryId ?? null,
+      recurrenceKind,
       transactionDate,
       input.description?.trim() || null,
       id,

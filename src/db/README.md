@@ -29,9 +29,19 @@ Entities use **singular** table names. Amounts are **integer cents**. Primary ke
 
 - `schema_migration` — applied migration versions
 - `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row); `archived_at` set when archived (migration 2)
-- `category` — user-defined; `type` is `income` or `expense`
+- `category` — user-defined; `type` is `income` or `expense`; optional `default_recurrence_kind` (migration 3)
 - `transfer` — header for money moved between two accounts
-- `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word)
+- `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word); `recurrence_kind` on income, expense, and investment rows (migration 3 renames from `expense_kind`)
+
+## Recurrence (`recurrence_kind`)
+
+Values: `recurring` | `variable`. Required on **`income`**, **`expense`**, and **`investment`** transactions; **`NULL`** on **transfer** legs.
+
+`category.default_recurrence_kind` optionally prefills the transaction form (expense categories also label investments such as PAC).
+
+Future projections can filter: `kind IN ('income','expense','investment') AND recurrence_kind = 'recurring'`.
+
+Helper: `recurrenceKindForTransactionKind()` in [`recurrence.ts`](recurrence.ts).
 
 Trade Republic is modeled as a **single account**: payments, remunerated cash, manual Saveback/PAC/ETF flows are **`transaction.kind = investment`** (or income/expense/transfer as appropriate), not a separate account type.
 

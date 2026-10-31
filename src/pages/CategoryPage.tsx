@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Modal } from '../components/ui/Modal'
-import type { CategoryType } from '../db/types'
+import { recurrenceKindLabel } from '../db/recurrence'
+import type { CategoryType, RecurrenceKind } from '../db/types'
 import {
   createCategory,
   deleteCategory,
@@ -19,6 +20,9 @@ export function CategoryPage() {
   const [editing, setEditing] = useState<CategoryRecord | null>(null)
   const [name, setName] = useState('')
   const [type, setType] = useState<CategoryType>('expense')
+  const [defaultRecurrenceKind, setDefaultRecurrenceKind] = useState<
+    RecurrenceKind | ''
+  >('')
   const [error, setError] = useState<string | null>(null)
 
   const categories = useMemo(() => {
@@ -35,6 +39,7 @@ export function CategoryPage() {
     setEditing(null)
     setName('')
     setType(filter === 'all' ? 'expense' : filter)
+    setDefaultRecurrenceKind('')
     setError(null)
     setModalOpen(true)
   }
@@ -43,6 +48,7 @@ export function CategoryPage() {
     setEditing(category)
     setName(category.name)
     setType(category.type)
+    setDefaultRecurrenceKind(category.defaultRecurrenceKind ?? '')
     setError(null)
     setModalOpen(true)
   }
@@ -53,11 +59,16 @@ export function CategoryPage() {
       setError('Name is required.')
       return
     }
+    const defaultRecurrence =
+      defaultRecurrenceKind === '' ? null : defaultRecurrenceKind
     try {
       if (editing) {
-        updateCategory(db, editing.id, name)
+        updateCategory(db, editing.id, {
+          name,
+          defaultRecurrenceKind: defaultRecurrence,
+        })
       } else {
-        createCategory(db, { name, type })
+        createCategory(db, { name, type, defaultRecurrenceKind: defaultRecurrence })
       }
       setModalOpen(false)
       bump()
@@ -84,7 +95,8 @@ export function CategoryPage() {
         <div>
           <h2 className="text-2xl font-semibold text-white">Categories</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Used for income and expense labeling.
+            Label income and expenses. Default recurrence also prefills investment
+            entries (e.g. PAC).
           </p>
         </div>
         <button
@@ -128,6 +140,11 @@ export function CategoryPage() {
                 <span className="ml-2 text-xs text-slate-500 uppercase">
                   {category.type}
                 </span>
+                {category.defaultRecurrenceKind ? (
+                  <span className="ml-2 text-xs text-slate-500">
+                    · {recurrenceKindLabel(category.defaultRecurrenceKind)}
+                  </span>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <button
@@ -177,6 +194,20 @@ export function CategoryPage() {
             >
               <option value="expense">Expense</option>
               <option value="income">Income</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-300">Default recurrence (optional)</span>
+            <select
+              value={defaultRecurrenceKind}
+              onChange={(event) =>
+                setDefaultRecurrenceKind(event.target.value as RecurrenceKind | '')
+              }
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+            >
+              <option value="">None</option>
+              <option value="recurring">Recurring</option>
+              <option value="variable">Variable</option>
             </select>
           </label>
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
