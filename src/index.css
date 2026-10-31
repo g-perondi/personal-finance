@@ -1,8 +1,25 @@
 @import 'tailwindcss';
+@import '@fontsource/inconsolata/400.css';
+@import '@fontsource/inconsolata/500.css';
+@import '@fontsource/inconsolata/600.css';
+@import '@fontsource/inconsolata/700.css';
+
+@theme {
+  --font-sans: 'Inconsolata', ui-monospace, monospace;
+  --font-mono: 'Inconsolata', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 0;
+  font-family: var(--font-sans);
   user-select: none;
   cursor: default;
 }
@@ -89,6 +106,76 @@ select,
   max-width: none;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.documents-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.documents-table col {
+  width: calc(100% / 7);
+}
+
+.documents-table :is(th, td) {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.documents-table th {
+  font-weight: 500;
+}
+
+/** Full-height route shell: toolbar fixed, list/table area scrolls internally. */
+.app-page {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/** Caps list/table scroll area to remaining viewport height. */
+.app-page-scroll-ceiling {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/** Page tables: natural height until capped, then scroll inside the shell. */
+.data-table-scroll-shell {
+  min-height: 0;
+  max-height: 100%;
+  flex: 0 1 auto;
+  width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(30 41 59);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.data-table-scroll-shell::-webkit-scrollbar {
+  display: none;
+}
+
+.data-table-scroll-shell--embedded {
+  border: none;
+  border-radius: 0;
+  max-height: none;
+  flex: 1 1 0%;
+}
+
+.data-table-scroll-shell .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: rgb(15 23 42 / 0.95);
+  box-shadow: 0 1px 0 rgb(30 41 59);
 }
 
 /** List rows outside `<table>` (categories, ledger). */

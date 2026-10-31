@@ -70,6 +70,62 @@ export function utcIsoToRomeDateInputValue(utcIso: string): string {
   return format(inRome, 'yyyy-MM-dd')
 }
 
+/** Value for `<input type="month">` (calendar month in Europe/Rome). */
+export function utcIsoToRomeMonthInputValue(utcIso: string): string {
+  const instant = normalizeStoredCalendarUtc(utcIso)
+  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
+  return format(inRome, 'yyyy-MM')
+}
+
+/** Start of Rome calendar month (`YYYY-MM`) as UTC ISO. */
+export function parseRomeYearMonthForStorage(yearMonth: string): UtcIsoString {
+  return romeMonthUtcBounds(yearMonth.trim()).startUtc
+}
+
+/** Italian calendar day label (`dd/MM/yyyy`, Europe/Rome). */
+export function formatItalianCalendarDateInRome(utcIso: string): string {
+  const instant = normalizeStoredCalendarUtc(utcIso)
+  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
+  return format(inRome, 'dd/MM/yyyy')
+}
+
+const ITALIAN_DATE_INPUT_RE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/
+
+/** Rome calendar `YYYY-MM-DD` → Italian form display `dd/MM/yyyy`. */
+export function formatRomeCalendarDateInputItalian(calendarDate: string): string {
+  const trimmed = calendarDate.trim()
+  if (!CALENDAR_DATE_RE.test(trimmed)) {
+    return ''
+  }
+  const [y, m, d] = trimmed.split('-')
+  return `${d}/${m}/${y}`
+}
+
+/** Italian typed date (`dd/MM/yyyy`, `/`, `-`, or `.`) → Rome `YYYY-MM-DD`, or null if invalid. */
+export function parseItalianCalendarDateInput(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return null
+  }
+  const match = ITALIAN_DATE_INPUT_RE.exec(trimmed)
+  if (!match) {
+    return null
+  }
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+  if (!Number.isInteger(year) || year < 1900 || year > 9999) {
+    return null
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return null
+  }
+  if (!Number.isInteger(day) || day < 1 || day > daysInRomeMonth(year, month)) {
+    return null
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 export function todayRomeDateInputValue(): string {
   const inRome = new TZDateMini(Date.now(), DISPLAY_TIME_ZONE)
   return format(inRome, 'yyyy-MM-dd')

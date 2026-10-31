@@ -6,21 +6,33 @@ type ModalProps = {
   open: boolean
   onClose: () => void
   children: ReactNode
+  panelClassName?: string
+  layerClassName?: string
 }
 
-export function Modal({ title, open, onClose, children }: ModalProps) {
+export function Modal({
+  title,
+  open,
+  onClose,
+  children,
+  panelClassName,
+  layerClassName = 'z-50',
+}: ModalProps) {
   if (!open) {
     return null
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className={`fixed inset-0 flex items-center justify-center bg-black/60 p-4 ${layerClassName}`}
       role="presentation"
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-xl"
+        className={
+          panelClassName ??
+          'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-xl'
+        }
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

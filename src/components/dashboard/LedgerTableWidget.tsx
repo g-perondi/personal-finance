@@ -40,9 +40,9 @@ export function LedgerTableWidget({
       {rows.length === 0 ? (
         <p className="min-h-0 flex-1 text-sm text-slate-500">{emptyMessage}</p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+        <div className="data-table-scroll-shell data-table-scroll-shell--embedded">
           <table className="data-table w-full table-fixed text-left text-xs">
-            <thead className="text-slate-500">
+            <thead className="bg-slate-900/80 text-slate-500">
               <tr>
                 <th className="pb-2 font-medium">Date</th>
                 <th className="pb-2 font-medium">Account</th>

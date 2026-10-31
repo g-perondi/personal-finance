@@ -313,8 +313,8 @@ export function TransactionPage() {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col p-8">
-      <header className="mb-6 border-b border-slate-800 pb-4">
+    <div className="app-page p-8">
+      <header className="mb-6 shrink-0 border-b border-slate-800 pb-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
           <div className="md:justify-self-start">
             <h2 className="text-2xl font-semibold text-white">Transactions</h2>
@@ -335,77 +335,83 @@ export function TransactionPage() {
         </div>
       </header>
 
-      {accounts.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          Create an account before adding transactions.
-        </p>
-      ) : null}
+      <div className="app-page-scroll-ceiling">
+        {accounts.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Create an account before adding transactions.
+          </p>
+        ) : null}
 
-      {transactions.length === 0 ? (
-        <p className="text-sm text-slate-500">No transactions in this period.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
-          <table className="transactions-table data-table text-sm">
-            <colgroup>
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-            </colgroup>
-            <thead className="bg-slate-900/80 text-slate-400">
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th className="money-cell">Amount</th>
-                <th>Category</th>
-                <th>Account</th>
-                <th>Recurrence</th>
-                <th>Description</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {transactions.map((tx) => (
-                <tr key={tx.id} className="text-slate-200">
-                  <td>{formatCalendarDateInRome(tx.transactionDate)}</td>
-                  <td className="capitalize">{kindLabel(tx.kind, tx.transferLeg)}</td>
-                  <td className="money-cell">{formatCents(tx.amountCents)}</td>
-                  <td className="truncate text-slate-400">{tx.categoryName ?? '—'}</td>
-                  <td className="truncate">{tx.accountName}</td>
-                  <td className="text-slate-400">
-                    {recurrenceKindLabel(tx.recurrenceKind)}
-                  </td>
-                  <td className="truncate text-slate-400">{tx.description ?? '—'}</td>
-                  <td>
-                    <div className="flex justify-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
-                        aria-label="Edit entry"
-                        onClick={() => handleRowEdit(tx)}
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-red-300"
-                        aria-label="Delete entry"
-                        onClick={() => handleDelete(tx)}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  </td>
+        {accounts.length > 0 && transactions.length === 0 ? (
+          <p className="text-sm text-slate-500">No transactions in this period.</p>
+        ) : null}
+
+        {transactions.length > 0 ? (
+          <div className="data-table-scroll-shell">
+            <table className="transactions-table data-table text-sm">
+              <colgroup>
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+              </colgroup>
+              <thead className="bg-slate-900/80 text-slate-400">
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th className="money-cell">Amount</th>
+                  <th>Category</th>
+                  <th>Account</th>
+                  <th>Recurrence</th>
+                  <th>Description</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {transactions.map((tx) => (
+                  <tr key={tx.id} className="text-slate-200">
+                    <td>{formatCalendarDateInRome(tx.transactionDate)}</td>
+                    <td className="capitalize">{kindLabel(tx.kind, tx.transferLeg)}</td>
+                    <td className="money-cell">{formatCents(tx.amountCents)}</td>
+                    <td className="truncate text-slate-400">
+                      {tx.categoryName ?? '—'}
+                    </td>
+                    <td className="truncate">{tx.accountName}</td>
+                    <td className="text-slate-400">
+                      {recurrenceKindLabel(tx.recurrenceKind)}
+                    </td>
+                    <td className="truncate text-slate-400">{tx.description ?? '—'}</td>
+                    <td>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                          aria-label="Edit entry"
+                          onClick={() => handleRowEdit(tx)}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-red-300"
+                          aria-label="Delete entry"
+                          onClick={() => handleDelete(tx)}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </div>
 
       <button
         type="button"

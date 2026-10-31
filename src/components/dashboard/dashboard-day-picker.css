@@ -1,4 +1,5 @@
 .dashboard-day-picker {
+  font-family: var(--font-sans);
   --rdp-accent-color: rgb(15 23 42);
   --rdp-accent-background-color: rgb(241 245 249);
   --rdp-background-color: rgb(15 23 42);

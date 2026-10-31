@@ -7,7 +7,7 @@ SQLite via [sql.js](https://github.com/sql-js/sql.js) in the browser. The binary
 All persisted timestamps are **UTC ISO 8601** strings (`…Z`). Application code uses `src/lib/datetime.ts`:
 
 - **Audit fields** (`created_at`, `archived_at`, `schema_migration.applied_at`): `utcNowIso()` on write; format with `formatDateTimeInRome()` in UI when needed.
-- **Business calendar dates** (`transaction_date`, `transfer_date`, `account.opened_at`): stored as UTC instants representing **start of that calendar day in `Europe/Rome`**. Forms use `<input type="date">` via `utcIsoToRomeDateInputValue()` / `todayRomeDateInputValue()`; lists use `formatCalendarDateInRome()`.
+- **Business calendar dates** (`transaction_date`, `transfer_date`, `account.opened_at`, optional `document.document_date`): stored as UTC instants representing **start of that calendar day in `Europe/Rome`**. Forms use Rome calendar `YYYY-MM-DD`; documents also allow typing **`dd/MM/yyyy`** and a calendar popover (`RomeCalendarDateInput`); transactions/accounts use `<input type="date">` via `utcIsoToRomeDateInputValue()` / `todayRomeDateInputValue()`; lists use `formatCalendarDateInRome()` or `formatItalianCalendarDateInRome()` for documents.
 - Legacy rows with bare `YYYY-MM-DD` are normalized on read to Rome-midnight UTC.
 
 There is no timezone picker; display always uses **Europe/Rome**.
@@ -29,6 +29,7 @@ Entities use **singular** table names. Amounts are **integer cents**. Primary ke
 
 - `schema_migration` — applied migration versions
 - `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row); `opened_at` = start of opening day in Rome (migration 4); `archived_at` when archived (migration 2)
+- `document_category` / `document` / `document_tag` — administrative files (migrations 5–6); see **Documents** below
 - `category` — user-defined; `type` is `income` or `expense`; optional `default_recurrence_kind` (migration 3)
 - `transfer` — header for money moved between two accounts
 - `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word); `recurrence_kind` on income, expense, and investment rows (migration 3 renames from `expense_kind`)
@@ -104,6 +105,20 @@ Month-end / daily series use the same rules at each point in time.
 **Ledger lists** on the dashboard show **Last movements** (all kinds in the selected period, most recent first). Repository sign filters: inflows = income + transfer-in; outflows = expense + investment + transfer-out.
 
 Repository: [`repositories/dashboard.ts`](repositories/dashboard.ts).
+
+## Documents
+
+Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction); file bytes in IndexedDB store **`document_blob`** (key = `document.id`). See [`document-blob.ts`](../document-blob.ts) and [`repositories/document.ts`](repositories/document.ts).
+
+- **`document_tag`**: many-to-many between `document` and `document_category` (migration 6); replaces `document.document_category_id`.
+- **`reference_year`** (required): calendar year for filtering in the UI; distinct years come from `listDocumentYears()`.
+- **`document_date`**: optional calendar day (Rome → UTC ISO; UI `dd/MM/yyyy`).
+- **List order** (`listDocuments`): SQL default newest-first by date / reference year / `created_at`; the documents table lets you re-sort by **Title**, **Year**, **Type**, **Size**, or **Date** (click column header to toggle asc/desc).
+- **`document_category`**: tag labels; a row exists only while at least one document links it via **`document_tag`**. Assign names on each document (add/edit modal); new names are persisted on save. Removing a tag from every document (or deleting those documents) drops the unused category row (`pruneUnusedDocumentCategories`).
+- Allowed MIME types: PDF, JPEG, PNG, WebP; max **15 MB** per file (`src/lib/document-upload.ts`).
+- Create order: insert `document` row → put blob → persist SQLite snapshot. Delete: remove blob then row.
+- **`file_name`**: stored as `{base}_{yyyyMMdd_HHmmss}{ext}` (UTC), derived from the uploaded name at create time (`buildStoredDocumentFileName` in `document-upload.ts`).
+- UI preview: blob object URLs in [`DocumentViewerModal`](../../components/documents/DocumentViewerModal.tsx) (PDF in `<iframe>`, images in `<img>`); revoked on close.
 
 ## Foreign keys
 

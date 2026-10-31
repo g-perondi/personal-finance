@@ -90,8 +90,8 @@ export function CategoryPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <div className="app-page p-8">
+      <header className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <h2 className="text-2xl font-semibold text-white">Categories</h2>
         <button
           type="button"
@@ -103,7 +103,7 @@ export function CategoryPage() {
         </button>
       </header>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex shrink-0 gap-2">
         {(['all', 'expense', 'income'] as const).map((value) => (
           <button
             key={value}
@@ -120,48 +120,52 @@ export function CategoryPage() {
         ))}
       </div>
 
-      {categories.length === 0 ? (
-        <p className="text-sm text-slate-500">No categories yet.</p>
-      ) : (
-        <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800">
-          {categories.map((category) => (
-            <li
-              key={category.id}
-              className="data-table-row flex items-center justify-between gap-4 px-4 py-3 text-sm text-slate-200"
-            >
-              <div>
-                <span className="font-medium text-white">{category.name}</span>
-                <span className="ml-2 text-xs text-slate-500 uppercase">
-                  {category.type}
-                </span>
-                {category.defaultRecurrenceKind ? (
-                  <span className="ml-2 text-xs text-slate-500">
-                    · {recurrenceKindLabel(category.defaultRecurrenceKind)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
-                  aria-label={`Edit ${category.name}`}
-                  onClick={() => openEdit(category)}
+      <div className="app-page-scroll-ceiling">
+        {categories.length === 0 ? (
+          <p className="text-sm text-slate-500">No categories yet.</p>
+        ) : (
+          <div className="data-table-scroll-shell">
+            <ul className="divide-y divide-slate-800">
+              {categories.map((category) => (
+                <li
+                  key={category.id}
+                  className="data-table-row flex items-center justify-between gap-4 px-4 py-3 text-sm text-slate-200"
                 >
-                  <Pencil className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-red-300"
-                  aria-label={`Delete ${category.name}`}
-                  onClick={() => handleDelete(category)}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <div>
+                    <span className="font-medium text-white">{category.name}</span>
+                    <span className="ml-2 text-xs text-slate-500 uppercase">
+                      {category.type}
+                    </span>
+                    {category.defaultRecurrenceKind ? (
+                      <span className="ml-2 text-xs text-slate-500">
+                        · {recurrenceKindLabel(category.defaultRecurrenceKind)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                      aria-label={`Edit ${category.name}`}
+                      onClick={() => openEdit(category)}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-red-300"
+                      aria-label={`Delete ${category.name}`}
+                      onClick={() => handleDelete(category)}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <Modal
         title={editing ? 'Edit category' : 'Add category'}

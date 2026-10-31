@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  dashboardChartFontFamily,
   dashboardBarChartTooltipCursor,
   dashboardChartLegendWrapperStyle,
   dashboardChartTooltipContentStyle,
@@ -58,8 +59,18 @@ export function CashflowChartWidget({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
-              <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `€${v}`} />
+              <XAxis
+                dataKey="name"
+                stroke="#94a3b8"
+                fontSize={12}
+                fontFamily={dashboardChartFontFamily}
+              />
+              <YAxis
+                stroke="#94a3b8"
+                fontSize={12}
+                fontFamily={dashboardChartFontFamily}
+                tickFormatter={(v) => `€${v}`}
+              />
               <Tooltip
                 formatter={(value) => `€${Number(value).toFixed(2)}`}
                 contentStyle={dashboardChartTooltipContentStyle}

@@ -32,7 +32,7 @@ function navLinkClass(isActive: boolean): string {
 
 export function AppShell() {
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="flex h-dvh max-h-dvh overflow-hidden bg-slate-950 font-sans text-slate-100">
       <aside className="flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900 px-4 py-6">
         <div className="mb-8 px-2">
           <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
@@ -54,7 +54,7 @@ export function AppShell() {
           ))}
         </nav>
       </aside>
-      <main className="flex flex-1 flex-col">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
       </main>
     </div>

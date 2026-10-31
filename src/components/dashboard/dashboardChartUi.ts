@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 
+export const dashboardChartFontFamily = 'Inconsolata, ui-monospace, monospace'
+
 /** Tooltip panel — matches slate panels (border-slate-800, bg-slate-900). */
 export const dashboardChartTooltipContentStyle: CSSProperties = {
   backgroundColor: '#0f172a',
@@ -7,10 +9,12 @@ export const dashboardChartTooltipContentStyle: CSSProperties = {
   borderRadius: '0.5rem',
   padding: '0.5rem 0.75rem',
   boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.45)',
+  fontFamily: dashboardChartFontFamily,
 }
 
 export const dashboardChartTooltipLabelStyle: CSSProperties = {
   color: '#f1f5f9',
+  fontFamily: dashboardChartFontFamily,
   fontWeight: 600,
   fontSize: 12,
   marginBottom: 4,
@@ -18,6 +22,7 @@ export const dashboardChartTooltipLabelStyle: CSSProperties = {
 
 export const dashboardChartTooltipItemStyle: CSSProperties = {
   color: '#e2e8f0',
+  fontFamily: dashboardChartFontFamily,
   fontSize: 12,
   lineHeight: '1.25rem',
 }
@@ -29,5 +34,6 @@ export const dashboardBarChartTooltipCursor = {
 
 export const dashboardChartLegendWrapperStyle: CSSProperties = {
   color: '#94a3b8',
+  fontFamily: dashboardChartFontFamily,
   fontSize: 12,
 }

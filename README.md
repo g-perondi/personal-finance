@@ -57,7 +57,7 @@ public/
 | 2     | Accounts, transactions, transfers                                    |
 | 3     | Recurrence on income, expense, investment + category defaults        |
 | 4     | Global dashboard (scope year/month/day), wealth charts, savings rate |
-| 5+    | Recurring rules, budget, investments, documents, backup              |
+| 5+    | Documents (MVP), backup zip; recurring rules and budget later        |
 
 ## Data notice
 

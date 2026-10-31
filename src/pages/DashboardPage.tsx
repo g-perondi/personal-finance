@@ -187,7 +187,7 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-8">
       <header className="border-b border-slate-800 pb-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
           <div className="md:justify-self-start">

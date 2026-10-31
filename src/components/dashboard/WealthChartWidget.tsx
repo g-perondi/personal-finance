@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import type { WealthSeriesPoint } from '../../db/repositories/dashboard'
 import {
+  dashboardChartFontFamily,
   dashboardChartLegendWrapperStyle,
   dashboardChartTooltipContentStyle,
   dashboardChartTooltipItemStyle,
@@ -57,8 +58,18 @@ export function WealthChartWidget({
               margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
-              <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `€${v}`} />
+              <XAxis
+                dataKey="name"
+                stroke="#94a3b8"
+                fontSize={12}
+                fontFamily={dashboardChartFontFamily}
+              />
+              <YAxis
+                stroke="#94a3b8"
+                fontSize={12}
+                fontFamily={dashboardChartFontFamily}
+                tickFormatter={(v) => `€${v}`}
+              />
               <Tooltip
                 formatter={(value) => `€${Number(value).toFixed(2)}`}
                 contentStyle={dashboardChartTooltipContentStyle}

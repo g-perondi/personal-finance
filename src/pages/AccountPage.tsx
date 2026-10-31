@@ -118,8 +118,8 @@ export function AccountPage() {
   const openingLocked = editing !== null && txCount > 0
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <div className="app-page p-8">
+      <header className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <h2 className="text-2xl font-semibold text-white">Accounts</h2>
         <button
           type="button"
@@ -131,69 +131,71 @@ export function AccountPage() {
         </button>
       </header>
 
-      {accounts.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          No accounts yet. Add your first account.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
-          <table className="accounts-table data-table text-sm">
-            <colgroup>
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-            </colgroup>
-            <thead className="bg-slate-900/80 text-slate-400">
-              <tr>
-                <th>Name</th>
-                <th className="money-cell">Balance</th>
-                <th className="money-cell">Average balance ({calendarYear})</th>
-                <th className="money-cell">Invested</th>
-                <th>Note</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {accounts.map((account) => (
-                <tr key={account.id} className="text-slate-200">
-                  <td className="truncate font-medium text-white">{account.name}</td>
-                  <td className="money-cell">{formatCents(account.balanceCents)}</td>
-                  <td className="money-cell">
-                    {formatCents(account.averageDailyBalanceYtdCents ?? 0)}
-                  </td>
-                  <td className="money-cell">
-                    {formatCents(account.investedYtdCents ?? 0)}
-                  </td>
-                  <td className="truncate text-slate-400">{account.note ?? '—'}</td>
-                  <td>
-                    <div className="flex justify-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
-                        aria-label={`Edit ${account.name}`}
-                        onClick={() => openEdit(account)}
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-amber-300"
-                        aria-label={`Archive ${account.name}`}
-                        onClick={() => handleArchive(account)}
-                      >
-                        <Archive className="size-4" />
-                      </button>
-                    </div>
-                  </td>
+      <div className="app-page-scroll-ceiling">
+        {accounts.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No accounts yet. Add your first account.
+          </p>
+        ) : (
+          <div className="data-table-scroll-shell">
+            <table className="accounts-table data-table text-sm">
+              <colgroup>
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+              </colgroup>
+              <thead className="bg-slate-900/80 text-slate-400">
+                <tr>
+                  <th>Name</th>
+                  <th className="money-cell">Balance</th>
+                  <th className="money-cell">Average balance ({calendarYear})</th>
+                  <th className="money-cell">Invested</th>
+                  <th>Note</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {accounts.map((account) => (
+                  <tr key={account.id} className="text-slate-200">
+                    <td className="truncate font-medium text-white">{account.name}</td>
+                    <td className="money-cell">{formatCents(account.balanceCents)}</td>
+                    <td className="money-cell">
+                      {formatCents(account.averageDailyBalanceYtdCents ?? 0)}
+                    </td>
+                    <td className="money-cell">
+                      {formatCents(account.investedYtdCents ?? 0)}
+                    </td>
+                    <td className="truncate text-slate-400">{account.note ?? '—'}</td>
+                    <td>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                          aria-label={`Edit ${account.name}`}
+                          onClick={() => openEdit(account)}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-amber-300"
+                          aria-label={`Archive ${account.name}`}
+                          onClick={() => handleArchive(account)}
+                        >
+                          <Archive className="size-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <Modal
         title={editing ? 'Edit account' : 'Add account'}

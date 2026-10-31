@@ -56,3 +56,30 @@ export type TransactionListItem = TransactionRecord & {
   accountName: string
   categoryName: string | null
 }
+
+export type DocumentCategoryRecord = {
+  id: string
+  name: string
+  createdAt: UtcIsoString
+}
+
+export type DocumentTagSummary = {
+  id: string
+  name: string
+}
+
+export type DocumentRecord = {
+  id: string
+  referenceYear: number
+  title: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  documentDate: UtcIsoString | null
+  note: string | null
+  createdAt: UtcIsoString
+}
+
+export type DocumentListItem = DocumentRecord & {
+  tags: DocumentTagSummary[]
+}

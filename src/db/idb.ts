@@ -1,7 +1,8 @@
 const IDB_NAME = 'personal-finance'
-const IDB_VERSION = 1
+export const IDB_VERSION = 2
 const STORE_NAME = 'database'
 const SNAPSHOT_KEY = 'sqlite'
+export const DOCUMENT_BLOB_STORE = 'document_blob'
 
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -13,9 +14,12 @@ function openIdb(): Promise<IDBDatabase> {
       resolve(request.result)
     })
     request.addEventListener('upgradeneeded', () => {
-      const db = request.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
+      const idb = request.result
+      if (!idb.objectStoreNames.contains(STORE_NAME)) {
+        idb.createObjectStore(STORE_NAME)
+      }
+      if (!idb.objectStoreNames.contains(DOCUMENT_BLOB_STORE)) {
+        idb.createObjectStore(DOCUMENT_BLOB_STORE)
       }
     })
   })
@@ -82,3 +86,5 @@ export async function deleteSnapshot(): Promise<void> {
     idb.close()
   }
 }
+
+export { openIdb, idbRequest, idbTransactionComplete }
