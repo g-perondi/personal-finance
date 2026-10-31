@@ -3,6 +3,7 @@ import type { RecurrenceKind, TransactionKind } from '../types'
 import { recurrenceKindForTransactionKind } from '../recurrence'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
+import { appendTransactionSearchClauses } from '../../lib/document-search-query'
 import {
   normalizeStoredCalendarUtc,
   parseCalendarDateForStorage,
@@ -62,6 +63,7 @@ export type ListTransactionsOptions = {
   startUtc?: string
   endUtcExclusive?: string
   limit?: number
+  searchQuery?: string | null
 }
 
 export function listTransactions(
@@ -87,6 +89,7 @@ export function listTransactions(
     clauses.push('t.transaction_date < ?')
     params.push(options.endUtcExclusive)
   }
+  appendTransactionSearchClauses(clauses, params, options.searchQuery)
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
   const limit = options.limit ?? 200

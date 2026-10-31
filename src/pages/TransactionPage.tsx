@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { DashboardPeriodToolbar } from '../components/dashboard/DashboardPeriodToolbar'
 import { DashboardScopeBar } from '../components/dashboard/DashboardScopeBar'
 import {
@@ -92,6 +92,7 @@ export function TransactionPage() {
   const [scope, setScope] = useState<DashboardScope>('global')
   const [period, setPeriod] = useState<DashboardPeriod>(() => defaultDashboardPeriod())
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null)
   const [editingTxId, setEditingTxId] = useState<string | null>(null)
@@ -118,8 +119,9 @@ export function TransactionPage() {
       limit: 500,
       startUtc: bounds.startUtc,
       endUtcExclusive: bounds.endUtcExclusive,
+      searchQuery,
     })
-  }, [db, refreshKey, bounds.startUtc, bounds.endUtcExclusive])
+  }, [db, refreshKey, bounds.startUtc, bounds.endUtcExclusive, searchQuery])
 
   const bump = useCallback(() => setRefreshKey((k) => k + 1), [])
 
@@ -335,6 +337,24 @@ export function TransactionPage() {
         </div>
       </header>
 
+      {accounts.length > 0 ? (
+        <label className="relative mb-4 block shrink-0">
+          <span className="sr-only">Search transactions</span>
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search description, account, category…"
+            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 py-2 pr-3 pl-10 text-sm text-white placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+            autoComplete="off"
+          />
+        </label>
+      ) : null}
+
       <div className="app-page-scroll-ceiling">
         {accounts.length === 0 ? (
           <p className="text-sm text-slate-500">
@@ -343,7 +363,11 @@ export function TransactionPage() {
         ) : null}
 
         {accounts.length > 0 && transactions.length === 0 ? (
-          <p className="text-sm text-slate-500">No transactions in this period.</p>
+          <p className="text-sm text-slate-500">
+            {searchQuery.trim()
+              ? 'No transactions match your search.'
+              : 'No transactions in this period.'}
+          </p>
         ) : null}
 
         {transactions.length > 0 ? (

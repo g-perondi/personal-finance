@@ -1,5 +1,10 @@
 import type { Database } from 'sql.js'
-import { deleteSnapshot, loadSnapshot, saveSnapshot } from './idb'
+import {
+  clearDocumentBlobStore,
+  deleteSnapshot,
+  loadSnapshot,
+  saveSnapshot,
+} from './idb'
 import { getCurrentSchemaVersion, runMigrations } from './migrations'
 
 const PERSIST_DEBOUNCE_MS = 400
@@ -132,6 +137,22 @@ export async function resetDatabaseForRetry(): Promise<void> {
   }
   initPromise = null
   await deleteSnapshot()
+}
+
+/** Remove SQLite snapshot and all document blobs, then reload the app. */
+export async function clearAllLocalData(): Promise<void> {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  if (dbInstance) {
+    dbInstance.close()
+    dbInstance = null
+  }
+  initPromise = null
+  await clearDocumentBlobStore()
+  await deleteSnapshot()
+  window.location.reload()
 }
 
 export type SqliteSnapshotInspection = {

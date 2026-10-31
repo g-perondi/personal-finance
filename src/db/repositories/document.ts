@@ -2,6 +2,7 @@ import type { Database } from 'sql.js'
 import { deleteDocumentBlob, getDocumentBlob, putDocumentBlob } from '../document-blob'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
+import { appendDocumentSearchClauses } from '../../lib/document-search-query'
 import {
   DOCUMENT_MAX_BYTES,
   buildStoredDocumentFileName,
@@ -126,6 +127,7 @@ function syncDocumentTags(db: Database, documentId: string, tagNames: string[]):
 export type ListDocumentsOptions = {
   referenceYear?: number
   documentCategoryId?: string | null
+  searchQuery?: string | null
 }
 
 export function listDocumentYears(db: Database): number[] {
@@ -156,6 +158,7 @@ export function listDocuments(
     )
     params.push(options.documentCategoryId)
   }
+  appendDocumentSearchClauses(clauses, params, options.searchQuery)
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
   const sql = `${DOCUMENT_SELECT} ${whereClause} ${DOCUMENT_LIST_ORDER}`
   const stmt = db.prepare(sql)

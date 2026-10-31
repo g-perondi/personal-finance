@@ -114,11 +114,16 @@ Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction
 - **`reference_year`** (required): calendar year for filtering in the UI; distinct years come from `listDocumentYears()`.
 - **`document_date`**: optional calendar day (Rome → UTC ISO; UI `dd/MM/yyyy`).
 - **List order** (`listDocuments`): SQL default newest-first by date / reference year / `created_at`; the documents table lets you re-sort by **Title**, **Year**, **Type**, **Size**, or **Date** (click column header to toggle asc/desc).
+- **Full-text search:** case-insensitive **LIKE** on `title`, `note`, `file_name`, and tag names (`appendDocumentSearchClauses` in [`document-search-query.ts`](../lib/document-search-query.ts)). No FTS5 — the bundled sql.js WASM does not include that module.
 - **`document_category`**: tag labels; a row exists only while at least one document links it via **`document_tag`**. Assign names on each document (add/edit modal); new names are persisted on save. Removing a tag from every document (or deleting those documents) drops the unused category row (`pruneUnusedDocumentCategories`).
 - Allowed MIME types: PDF, JPEG, PNG, WebP; max **15 MB** per file (`src/lib/document-upload.ts`).
 - Create order: insert `document` row → put blob → persist SQLite snapshot. Delete: remove blob then row.
 - **`file_name`**: stored as `{base}_{yyyyMMdd_HHmmss}{ext}` (UTC), derived from the uploaded name at create time (`buildStoredDocumentFileName` in `document-upload.ts`).
 - UI preview: blob object URLs in [`DocumentViewerModal`](../../components/documents/DocumentViewerModal.tsx) (PDF in `<iframe>`, images in `<img>`); revoked on close.
+
+## Transactions (list search)
+
+Case-insensitive **LIKE** on **description**, **account name**, and **category name** within the selected period (`appendTransactionSearchClauses` in [`document-search-query.ts`](../lib/document-search-query.ts)).
 
 ## Foreign keys
 
@@ -138,7 +143,7 @@ Full export is a **ZIP** (`formatVersion` 1) built in [`src/lib/backup.ts`](../l
 
 **Restore:** replaces the SQLite snapshot and **clears** then repopulates `document_blob`; validates manifest, opens `sqlite.db` in a throwaway database to ensure every `document.id` has a matching blob entry, then **`window.location.reload()`** so the app singleton reopens cleanly.
 
-UI: sidebar footer **Download backup** / **Restore backup** (English). Restore is destructive — confirm in a modal before import.
+UI: sidebar footer **Download backup** / **Restore backup** / **Clear all data** (English). Restore and clear are destructive — confirm in a modal before proceeding.
 
 ## Migrations
 

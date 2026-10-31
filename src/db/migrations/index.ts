@@ -5,6 +5,7 @@ import recurrenceKindSql from './003_recurrence_kind.sql?raw'
 import accountOpenedAtSql from './004_account_opened_at.sql?raw'
 import documentSql from './005_document.sql?raw'
 import documentTagSql from './006_document_tag.sql?raw'
+import dropFtsSql from './009_drop_fts.sql?raw'
 import { utcNowIso } from '../../lib/datetime'
 
 const MIGRATIONS: { version: number; sql: string }[] = [
@@ -14,6 +15,7 @@ const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 4, sql: accountOpenedAtSql },
   { version: 5, sql: documentSql },
   { version: 6, sql: documentTagSql },
+  { version: 9, sql: dropFtsSql },
 ]
 
 function tableExists(db: Database, tableName: string): boolean {
