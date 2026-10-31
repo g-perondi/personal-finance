@@ -50,15 +50,15 @@ public/
 
 ## Roadmap
 
-| Phase | Scope                                                                |
-| ----- | -------------------------------------------------------------------- |
-| 0     | Project scaffold and tooling (current)                               |
-| 1     | Database layer + multi-account schema                                |
-| 2     | Accounts, transactions, transfers                                    |
-| 3     | Recurrence on income, expense, investment + category defaults        |
-| 4     | Global dashboard (scope year/month/day), wealth charts, savings rate |
-| 5+    | Documents (MVP), backup zip; recurring rules and budget later        |
+| Phase | Scope                                                                   |
+| ----- | ----------------------------------------------------------------------- |
+| 0     | Project scaffold and tooling (current)                                  |
+| 1     | Database layer + multi-account schema                                   |
+| 2     | Accounts, transactions, transfers                                       |
+| 3     | Recurrence on income, expense, investment + category defaults           |
+| 4     | Global dashboard (scope year/month/day), wealth charts, savings rate    |
+| 5+    | Documents (MVP), backup zip (sidebar); recurring rules and budget later |
 
 ## Data notice
 
-Data is stored only in this browser profile (IndexedDB). Use Settings backup (Phase 5+) before clearing site data or switching browsers.
+Data is stored only in this browser profile (IndexedDB). Use **Download backup** in the sidebar before clearing site data or switching browsers.

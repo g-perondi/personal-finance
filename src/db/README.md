@@ -124,6 +124,22 @@ Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction
 
 `PRAGMA foreign_keys = ON` is set on every open.
 
+## Backup
+
+Full export is a **ZIP** (`formatVersion` 1) built in [`src/lib/backup.ts`](../lib/backup.ts):
+
+| Entry                | Content                                                             |
+| -------------------- | ------------------------------------------------------------------- |
+| `manifest.json`      | `formatVersion`, `exportedAt` (UTC ISO), `schemaVersion`, `blobIds` |
+| `sqlite.db`          | sql.js snapshot (same bytes as IndexedDB key `sqlite`)              |
+| `blobs/{documentId}` | Raw file bytes from IndexedDB store `document_blob`                 |
+
+**Export:** flushes the in-memory DB to IndexedDB (`flushPersist()`), then zips snapshot + all blob keys. Max **100 MB** per archive.
+
+**Restore:** replaces the SQLite snapshot and **clears** then repopulates `document_blob`; validates manifest, opens `sqlite.db` in a throwaway database to ensure every `document.id` has a matching blob entry, then **`window.location.reload()`** so the app singleton reopens cleanly.
+
+UI: sidebar footer **Download backup** / **Restore backup** (English). Restore is destructive — confirm in a modal before import.
+
 ## Migrations
 
 `runMigrations()` reads `MAX(version)` from `schema_migration` and applies SQL files with higher version numbers, then records the version and triggers a debounced IndexedDB persist (~400 ms).

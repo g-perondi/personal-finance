@@ -75,6 +75,36 @@ export async function saveSnapshot(data: Uint8Array): Promise<void> {
   }
 }
 
+/** Immediate persist of the SQLite snapshot (same as saveSnapshot). */
+export async function replaceSnapshot(data: Uint8Array): Promise<void> {
+  await saveSnapshot(data)
+}
+
+export async function listDocumentBlobKeys(): Promise<string[]> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(DOCUMENT_BLOB_STORE, 'readonly')
+    const store = tx.objectStore(DOCUMENT_BLOB_STORE)
+    const keys = await idbRequest(store.getAllKeys())
+    await idbTransactionComplete(tx)
+    return keys.filter((key): key is string => typeof key === 'string')
+  } finally {
+    idb.close()
+  }
+}
+
+export async function clearDocumentBlobStore(): Promise<void> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(DOCUMENT_BLOB_STORE, 'readwrite')
+    const store = tx.objectStore(DOCUMENT_BLOB_STORE)
+    store.clear()
+    await idbTransactionComplete(tx)
+  } finally {
+    idb.close()
+  }
+}
+
 export async function deleteSnapshot(): Promise<void> {
   const idb = await openIdb()
   try {

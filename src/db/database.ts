@@ -1,6 +1,6 @@
 import type { Database } from 'sql.js'
 import { deleteSnapshot, loadSnapshot, saveSnapshot } from './idb'
-import { runMigrations } from './migrations'
+import { getCurrentSchemaVersion, runMigrations } from './migrations'
 
 const PERSIST_DEBOUNCE_MS = 400
 
@@ -54,12 +54,30 @@ export function schedulePersist(): void {
   }
   persistTimer = setTimeout(() => {
     persistTimer = null
-    if (!dbInstance) {
-      return
-    }
-    const snapshot = dbInstance.export()
-    void saveSnapshot(snapshot)
+    void flushPersistInternal()
   }, PERSIST_DEBOUNCE_MS)
+}
+
+async function flushPersistInternal(): Promise<void> {
+  if (!dbInstance) {
+    return
+  }
+  const snapshot = dbInstance.export()
+  await saveSnapshot(snapshot)
+}
+
+/** Write the in-memory database to IndexedDB immediately (clears pending debounce). */
+export async function flushPersist(): Promise<Uint8Array> {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  if (!dbInstance) {
+    throw new Error('Database is not initialized')
+  }
+  const snapshot = dbInstance.export()
+  await saveSnapshot(snapshot)
+  return snapshot
 }
 
 async function initDatabaseInternal(): Promise<Database> {
@@ -114,4 +132,39 @@ export async function resetDatabaseForRetry(): Promise<void> {
   }
   initPromise = null
   await deleteSnapshot()
+}
+
+export type SqliteSnapshotInspection = {
+  schemaVersion: number
+  documentIds: string[]
+}
+
+/** Open a snapshot in a throwaway in-memory database (does not replace the app singleton). */
+export async function inspectSqliteSnapshot(
+  data: Uint8Array,
+): Promise<SqliteSnapshotInspection> {
+  const SQL = await loadSqlJsModule()
+  const db = new SQL.Database(data)
+  try {
+    db.run('PRAGMA foreign_keys = ON')
+    const schemaVersion = getCurrentSchemaVersion(db)
+    const documentIds = listDocumentIdsInSnapshot(db)
+    return { schemaVersion, documentIds }
+  } finally {
+    db.close()
+  }
+}
+
+function listDocumentIdsInSnapshot(db: Database): string[] {
+  const tableCheck = db.exec(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'document' LIMIT 1",
+  )
+  if (tableCheck.length === 0 || tableCheck[0]!.values.length === 0) {
+    return []
+  }
+  const result = db.exec('SELECT id FROM document')
+  if (result.length === 0) {
+    return []
+  }
+  return result[0]!.values.map((row) => String(row[0]))
 }

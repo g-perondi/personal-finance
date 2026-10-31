@@ -1,12 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import {
-  ArrowLeftRight,
-  FolderOpen,
-  LayoutDashboard,
-  Settings,
-  Tag,
-  Wallet,
-} from 'lucide-react'
+import { ArrowLeftRight, FolderOpen, LayoutDashboard, Tag, Wallet } from 'lucide-react'
+import { SidebarBackupSection } from './SidebarBackupSection'
 
 const navItems: Array<{
   to: string
@@ -19,7 +13,6 @@ const navItems: Array<{
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/documents', label: 'Documents', icon: FolderOpen },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
-  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function navLinkClass(isActive: boolean): string {
@@ -53,6 +46,7 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
+        <SidebarBackupSection />
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Outlet />
