@@ -54,13 +54,17 @@ Account balance (derived, not stored):
 opening_balance_cents + SUM(signed_amount_cents per transaction row)
 ```
 
-| `kind`       | `transfer_leg` | Effect on balance |
-| ------------ | -------------- | ----------------- |
-| `income`     | —              | +amount           |
-| `expense`    | —              | −amount           |
-| `investment` | —              | −amount           |
-| `transfer`   | `out`          | −amount           |
-| `transfer`   | `in`           | +amount           |
+| `kind`        | `transfer_leg` | Effect on balance |
+| ------------- | -------------- | ----------------- |
+| `income`      | —              | +amount           |
+| `expense`     | —              | −amount           |
+| `investment`  | —              | −amount           |
+| `transfer`    | `out`          | −amount           |
+| `transfer`    | `in`           | +amount           |
+| `rebalancing` | `increase`     | +amount           |
+| `rebalancing` | `decrease`     | −amount           |
+
+Period KPI **Income** / **Expenses** include rebalancing increase / decrease respectively (not investment).
 
 Helper: `signedAmountCents()` in `types.ts`.
 
@@ -89,18 +93,18 @@ Scope uses calendar **Europe/Rome** (`src/lib/dashboard-period.ts`, `src/lib/dat
 
 **Cashflow** (transfers excluded from income/expense/investment totals):
 
-- **Saved** = income − expense; **savings rate** = saved / income when income > 0
+- **Net balance** = income − expense; **savings rate** = net balance / income when income > 0
 - Investments are a separate series; conceptually part of savings
 - **Total balance** (KPI) = wealth at the **end** of the selected scope (`getTotalWealthCentsAt` at `periodBounds` `endUtcExclusive`), not live account balances
 - Accounts with `opened_at >= asOf` contribute **0** at that instant (periods before the account opening date)
 
 **Wealth** at instant `T` (non-archived accounts that already exist at `T`, i.e. `opened_at < T`):
 
-- **Total** — opening balance plus signed movements with `transaction_date < T` (same as account balance sum)
-- **Investment** — cumulative sum of `investment` transaction amounts before `T`
-- **Cash** — total minus investment (remainder of net worth not counted as deployed capital)
+- **Total** — sum of account balances at `T` plus **ETF cost basis** from `holding_purchase` rows with `purchase_date < T` (opening seeds and buys)
+- **Investment** — that ETF cost basis plus **`investment`** transactions before `T` that are not linked to a holding purchase (avoids double-counting recorded ETF buys)
+- **Cash** — total minus investment (liquid / non-deployed portion in this model)
 
-Month-end / daily series use the same rules at each point in time.
+Month-end / daily series use the same rules at each point in time. Historical points use **cost basis**, not market quotes.
 
 **Ledger lists** on the dashboard show **Last movements** (all kinds in the selected period, most recent first). Repository sign filters: inflows = income + transfer-in; outflows = expense + investment + transfer-out.
 
@@ -111,10 +115,10 @@ Repository: [`repositories/dashboard.ts`](repositories/dashboard.ts).
 Portfolio positions are separate from the cash ledger: **`instrument`** (ISIN, Yahoo/API `quote_symbol`, name), **`holding`** (one row per account + ETF: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; optional `transaction_id` for buys that also post an **`investment`** transaction).
 
 - **Weighted average cost:** display avg = `total_cost_cents / quantity`; new buys add amount to cost and units from `amount_cents / price_cents_per_unit`.
-- **Opening seed:** `createOpeningHolding` — no ledger row; `transaction_id` NULL on the purchase row.
+- **Opening seed:** `createOpeningHolding` — `openingDate`, `quantity`, and average **`priceCentsPerUnit`** (cost basis = round(qty × price)); optional **`recordInvestmentTransaction`** (default off in API; UI defaults on) posts a matching **`investment`** row and links `holding_purchase.transaction_id`.
 - **New purchase:** `recordHoldingPurchase` — updates holding, inserts purchase, inserts matching **`transaction`** (`kind = investment`) on the same account/date/amount.
 - **Quotes:** [`src/lib/market-quotes/`](../lib/market-quotes/) fetches delayed/unofficial prices in the browser (CORS providers + SQLite **`instrument_quote_cache`**). Live fetch runs only when opening **`/investments`** or clicking **Refresh quotes**; the dashboard **Portfolio value** KPI uses cached prices from the last fetch.
-- **Wealth chart “Investment”** still reflects cumulative **`investment`** movements; market value KPI reflects holdings × last quote.
+- **Wealth chart** uses the rules above (holdings cost basis over time; not live quote marks).
 
 Repositories: [`repositories/instrument.ts`](repositories/instrument.ts), [`repositories/holding.ts`](repositories/holding.ts).
 

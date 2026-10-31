@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
+import {
+  TransactionKindDisplay,
+  TransactionAmountDisplay,
+} from '../transactions/TransactionKindDisplay'
 import type { LedgerRow } from '../../db/repositories/dashboard'
 import { formatCalendarDateInRome } from '../../lib/datetime'
-import { formatCents } from '../../lib/money'
 
 type LedgerTableWidgetProps = {
   title: string
@@ -10,13 +13,6 @@ type LedgerTableWidgetProps = {
   viewAllHref: string
   emptyMessage?: string
   className?: string
-}
-
-function rowLabel(row: LedgerRow): string {
-  if (row.kind === 'transfer') {
-    return row.transferLeg === 'in' ? 'Transfer in' : 'Transfer out'
-  }
-  return row.kind.charAt(0).toUpperCase() + row.kind.slice(1)
 }
 
 export function LedgerTableWidget({
@@ -28,7 +24,7 @@ export function LedgerTableWidget({
   className,
 }: LedgerTableWidgetProps) {
   const sectionClass = [
-    'flex h-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/30 p-4',
+    'flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/30 p-4',
     className,
   ]
     .filter(Boolean)
@@ -40,29 +36,39 @@ export function LedgerTableWidget({
       {rows.length === 0 ? (
         <p className="min-h-0 flex-1 text-sm text-slate-500">{emptyMessage}</p>
       ) : (
-        <div className="data-table-scroll-shell data-table-scroll-shell--embedded">
-          <table className="data-table w-full table-fixed text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-500">
-              <tr>
-                <th className="pb-2 font-medium">Date</th>
-                <th className="pb-2 font-medium">Account</th>
-                <th className="pb-2 font-medium">Type</th>
-                <th className="money-cell pb-2 font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-300">
+        <div className="data-table-scroll-shell data-table-scroll-shell--embedded min-w-0">
+          <table className="ledger-table data-table w-full text-left text-xs">
+            <colgroup>
+              <col className="ledger-col-icon" />
+              <col className="ledger-col-amount" />
+              <col className="ledger-col-date" />
+              <col className="ledger-col-description" />
+            </colgroup>
+            <tbody className="divide-y divide-slate-800/80 text-slate-300">
               {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="data-table-row border-t border-slate-800/80"
-                >
-                  <td className="py-2 pr-2">
+                <tr key={row.id} className="data-table-row">
+                  <td className="py-2">
+                    <TransactionKindDisplay
+                      kind={row.kind}
+                      transferLeg={row.transferLeg}
+                      rebalancingDirection={row.rebalancingDirection}
+                      compact
+                      showLabel={false}
+                    />
+                  </td>
+                  <td className="money-cell py-2">
+                    <TransactionAmountDisplay
+                      kind={row.kind}
+                      transferLeg={row.transferLeg}
+                      rebalancingDirection={row.rebalancingDirection}
+                      amountCents={row.amountCents}
+                    />
+                  </td>
+                  <td className="py-2 whitespace-nowrap text-slate-400">
                     {formatCalendarDateInRome(row.transactionDate)}
                   </td>
-                  <td className="py-2 pr-2">{row.accountName}</td>
-                  <td className="py-2 pr-2 text-slate-400">{rowLabel(row)}</td>
-                  <td className="money-cell py-2 font-medium">
-                    {formatCents(row.amountCents)}
+                  <td className="truncate py-2 text-slate-400">
+                    {row.description ?? '—'}
                   </td>
                 </tr>
               ))}

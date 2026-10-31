@@ -146,8 +146,11 @@ function applyPurchaseToHolding(
 export type CreateOpeningHoldingInput = {
   accountId: string
   instrument: UpsertInstrumentInput
+  openingDate: string
   quantity: number
-  totalCostCents: number
+  priceCentsPerUnit: number
+  /** When true, posts an `investment` transaction on the account (cashflow + balance). */
+  recordInvestmentTransaction?: boolean
 }
 
 export function createOpeningHolding(
@@ -157,8 +160,12 @@ export function createOpeningHolding(
   if (input.quantity <= 0) {
     throw new Error('Quantity must be greater than zero.')
   }
-  if (input.totalCostCents <= 0) {
-    throw new Error('Total cost must be greater than zero.')
+  if (input.priceCentsPerUnit <= 0) {
+    throw new Error('Price per unit must be greater than zero.')
+  }
+  const totalCostCents = Math.round(input.quantity * input.priceCentsPerUnit)
+  if (totalCostCents <= 0) {
+    throw new Error('Cost basis must be greater than zero.')
   }
   const instrument = upsertInstrument(db, input.instrument)
   const existing = findHoldingByAccountInstrument(db, input.accountId, instrument.id)
@@ -166,14 +173,28 @@ export function createOpeningHolding(
     throw new Error('A holding already exists for this account and ETF.')
   }
 
-  const priceCentsPerUnit = input.totalCostCents / input.quantity
+  const purchaseDate = parseCalendarDateForStorage(input.openingDate)
   const holding = insertHolding(
     db,
     input.accountId,
     instrument.id,
     input.quantity,
-    input.totalCostCents,
+    totalCostCents,
   )
+
+  let transactionId: string | null = null
+  if (input.recordInvestmentTransaction) {
+    const tx = createSimpleTransaction(db, {
+      accountId: input.accountId,
+      kind: 'investment',
+      amountCents: totalCostCents,
+      transactionDate: input.openingDate,
+      description: instrument.name,
+      categoryId: null,
+      recurrenceKind: 'variable',
+    })
+    transactionId = tx.id
+  }
 
   const purchaseId = newId()
   const createdAt = utcNowIso()
@@ -181,13 +202,14 @@ export function createOpeningHolding(
     `INSERT INTO holding_purchase (
       id, holding_id, transaction_id, purchase_date, amount_cents,
       price_cents_per_unit, quantity, created_at
-    ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       purchaseId,
       holding.id,
-      createdAt,
-      input.totalCostCents,
-      priceCentsPerUnit,
+      transactionId,
+      purchaseDate,
+      totalCostCents,
+      input.priceCentsPerUnit,
       input.quantity,
       createdAt,
     ],

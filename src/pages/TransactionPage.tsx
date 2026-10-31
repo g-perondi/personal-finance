@@ -6,13 +6,18 @@ import {
   EntryKindPicker,
   type EntryKind,
 } from '../components/transactions/EntryKindPicker'
+import {
+  TransactionKindDisplay,
+  TransactionAmountDisplay,
+} from '../components/transactions/TransactionKindDisplay'
 import { Modal } from '../components/ui/Modal'
 import { getEarliestAccountYearInRome, listAccounts } from '../db/repositories/account'
 import { listCategories } from '../db/repositories/category'
-import type { TransactionListItem } from '../db/repositories/model'
+import type { TransactionListItem, TransactionRecord } from '../db/repositories/model'
 import {
   createSimpleTransaction,
   deleteSimpleTransaction,
+  getTransactionById,
   listTransactions,
   updateSimpleTransaction,
 } from '../db/repositories/transaction'
@@ -21,7 +26,6 @@ import {
   deleteTransfer,
   updateTransfer,
 } from '../db/repositories/transfer'
-import { recurrenceKindLabel } from '../db/recurrence'
 import type { RecurrenceKind } from '../db/types'
 import { useDatabase } from '../hooks/useDatabase'
 import {
@@ -38,6 +42,12 @@ import {
   utcIsoToRomeDateInputValue,
 } from '../lib/datetime'
 import { centsToInputValue, formatCents, parseInputToCents } from '../lib/money'
+import {
+  computeEntryPreviewDeltas,
+  originalDeltaForEditingTransaction,
+  originalDeltasForEditingTransfer,
+  projectBalanceAfterEntry,
+} from '../lib/balance-projection'
 
 type FormState = {
   kind: EntryKind
@@ -77,14 +87,35 @@ function addEntryModalTitle(
   return 'Add entry'
 }
 
-function kindLabel(
-  kind: TransactionListItem['kind'],
-  transferLeg: TransactionListItem['transferLeg'],
-): string {
-  if (kind === 'transfer') {
-    return transferLeg === 'out' ? 'Transfer out' : 'Transfer in'
+function BalancePreviewBlock({
+  label,
+  currentCents,
+  afterCents,
+}: {
+  label: string
+  currentCents: number | null
+  afterCents: number | null
+}) {
+  if (currentCents === null) {
+    return null
   }
-  return kind.charAt(0).toUpperCase() + kind.slice(1)
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm">
+      <p className="font-medium text-slate-300">{label}</p>
+      <p className="mt-1 text-slate-400">
+        Current balance:{' '}
+        <span className="font-medium text-white tabular-nums">
+          {formatCents(currentCents)}
+        </span>
+      </p>
+      <p className="text-slate-400">
+        Balance after entry:{' '}
+        <span className="font-medium text-white tabular-nums">
+          {afterCents === null ? '—' : formatCents(afterCents)}
+        </span>
+      </p>
+    </div>
+  )
 }
 
 export function TransactionPage() {
@@ -96,6 +127,12 @@ export function TransactionPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null)
   const [editingTxId, setEditingTxId] = useState<string | null>(null)
+  const [editingOriginalTx, setEditingOriginalTx] = useState<TransactionRecord | null>(
+    null,
+  )
+  const [editingTransferLegs, setEditingTransferLegs] = useState<TransactionRecord[]>(
+    [],
+  )
   const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
 
@@ -137,6 +174,8 @@ export function TransactionPage() {
   function openCreate() {
     setEditingTransferId(null)
     setEditingTxId(null)
+    setEditingOriginalTx(null)
+    setEditingTransferLegs([])
     const firstAccount = accounts[0]?.id ?? ''
     const secondAccount =
       accounts.find((account) => account.id !== firstAccount)?.id ?? ''
@@ -156,8 +195,16 @@ export function TransactionPage() {
     if (tx.kind === 'transfer') {
       return
     }
+    if (tx.kind === 'rebalancing') {
+      window.alert(
+        'Rebalancing entries cannot be edited. Delete the entry or reconcile again from Accounts.',
+      )
+      return
+    }
     setEditingTxId(tx.id)
     setEditingTransferId(null)
+    setEditingOriginalTx(getTransactionById(db, tx.id))
+    setEditingTransferLegs([])
     setForm({
       kind: tx.kind as EntryKind,
       accountId: tx.accountId,
@@ -185,6 +232,8 @@ export function TransactionPage() {
     }
     setEditingTransferId(tx.transferId)
     setEditingTxId(null)
+    setEditingOriginalTx(null)
+    setEditingTransferLegs(legs)
     setForm({
       kind: 'transfer',
       accountId: '',
@@ -201,6 +250,12 @@ export function TransactionPage() {
   }
 
   function handleRowEdit(tx: TransactionListItem) {
+    if (tx.kind === 'rebalancing') {
+      window.alert(
+        'Rebalancing entries cannot be edited. Delete the entry or reconcile again from Accounts.',
+      )
+      return
+    }
     if (tx.kind === 'transfer' && tx.transferId) {
       openEditTransfer(tx)
       return
@@ -295,6 +350,91 @@ export function TransactionPage() {
   const addDisabled = accounts.length === 0
   const transferKindDisabled = accounts.length < 2
 
+  const balancePreview = useMemo(() => {
+    const amountCents = parseInputToCents(form.amount)
+    const parsedAmount = amountCents !== null && amountCents > 0 ? amountCents : null
+    const deltas = computeEntryPreviewDeltas({
+      kind: form.kind,
+      amountCents: parsedAmount,
+      accountId: form.accountId,
+      fromAccountId: form.fromAccountId,
+      toAccountId: form.toAccountId,
+    })
+
+    const balanceForAccount = (accountId: string): number | null => {
+      const row = accounts.find((account) => account.id === accountId)
+      return row?.balanceCents ?? null
+    }
+
+    if (form.kind === 'transfer') {
+      const original = originalDeltasForEditingTransfer(editingTransferLegs)
+      const fromCurrent = balanceForAccount(form.fromAccountId)
+      const toCurrent = balanceForAccount(form.toAccountId)
+      const fromOriginal =
+        editingTransferLegs.find((leg) => leg.transferLeg === 'out')?.accountId ===
+        form.fromAccountId
+          ? original.fromDelta
+          : 0
+      const toOriginal =
+        editingTransferLegs.find((leg) => leg.transferLeg === 'in')?.accountId ===
+        form.toAccountId
+          ? original.toDelta
+          : 0
+      return {
+        primary: null,
+        from:
+          fromCurrent === null
+            ? null
+            : {
+                current: fromCurrent,
+                after:
+                  deltas.fromDelta === null
+                    ? null
+                    : projectBalanceAfterEntry(
+                        fromCurrent,
+                        fromOriginal,
+                        deltas.fromDelta,
+                      ),
+              },
+        to:
+          toCurrent === null
+            ? null
+            : {
+                current: toCurrent,
+                after:
+                  deltas.toDelta === null
+                    ? null
+                    : projectBalanceAfterEntry(toCurrent, toOriginal, deltas.toDelta),
+              },
+      }
+    }
+
+    const accountId = form.accountId
+    const current = accountId ? balanceForAccount(accountId) : null
+    const originalDelta =
+      editingOriginalTx && editingOriginalTx.accountId === accountId
+        ? originalDeltaForEditingTransaction(editingOriginalTx)
+        : 0
+    return {
+      primary:
+        current === null
+          ? null
+          : {
+              current,
+              after:
+                deltas.primaryDelta === null
+                  ? null
+                  : projectBalanceAfterEntry(
+                      current,
+                      originalDelta,
+                      deltas.primaryDelta,
+                    ),
+            },
+      from: null,
+      to: null,
+    }
+  }, [accounts, editingOriginalTx, editingTransferLegs, form])
+
   function handleEntryKindChange(kind: EntryKind) {
     if (isEditing) {
       return
@@ -371,45 +511,60 @@ export function TransactionPage() {
         ) : null}
 
         {transactions.length > 0 ? (
-          <div className="data-table-scroll-shell">
+          <div className="data-table-scroll-shell min-w-0">
             <table className="transactions-table data-table text-sm">
               <colgroup>
+                <col className="transactions-col-icon" />
                 <col />
                 <col />
                 <col />
                 <col />
                 <col />
-                <col />
-                <col />
-                <col />
+                <col className="transactions-col-actions" />
               </colgroup>
               <thead className="bg-slate-900/80 text-slate-400">
                 <tr>
-                  <th>Date</th>
-                  <th>Type</th>
+                  <th scope="col" className="transactions-cell-icon" aria-label="Type">
+                    <span className="sr-only">Type</span>
+                  </th>
                   <th className="money-cell">Amount</th>
-                  <th>Category</th>
-                  <th>Account</th>
-                  <th>Recurrence</th>
                   <th>Description</th>
-                  <th>Actions</th>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Category</th>
+                  <th scope="col" className="transactions-cell-actions">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {transactions.map((tx) => (
                   <tr key={tx.id} className="text-slate-200">
+                    <td className="transactions-cell-icon">
+                      <TransactionKindDisplay
+                        kind={tx.kind}
+                        transferLeg={tx.transferLeg}
+                        rebalancingDirection={tx.rebalancingDirection}
+                        showLabel={false}
+                      />
+                    </td>
+                    <td className="money-cell">
+                      <TransactionAmountDisplay
+                        kind={tx.kind}
+                        transferLeg={tx.transferLeg}
+                        rebalancingDirection={tx.rebalancingDirection}
+                        amountCents={tx.amountCents}
+                      />
+                    </td>
+                    <td className="max-w-0 truncate text-slate-400">
+                      {tx.description ?? '—'}
+                    </td>
                     <td>{formatCalendarDateInRome(tx.transactionDate)}</td>
-                    <td className="capitalize">{kindLabel(tx.kind, tx.transferLeg)}</td>
-                    <td className="money-cell">{formatCents(tx.amountCents)}</td>
-                    <td className="truncate text-slate-400">
+                    <td className="max-w-0 truncate">{tx.accountName}</td>
+                    <td className="max-w-0 truncate text-slate-400">
                       {tx.categoryName ?? '—'}
                     </td>
-                    <td className="truncate">{tx.accountName}</td>
-                    <td className="text-slate-400">
-                      {recurrenceKindLabel(tx.recurrenceKind)}
-                    </td>
-                    <td className="truncate text-slate-400">{tx.description ?? '—'}</td>
-                    <td>
+                    <td className="transactions-cell-actions">
                       <div className="flex justify-center gap-2">
                         <button
                           type="button"
@@ -532,6 +687,40 @@ export function TransactionPage() {
               className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
             />
           </label>
+
+          {form.kind === 'transfer' ? (
+            <>
+              {balancePreview.from ? (
+                <BalancePreviewBlock
+                  label={
+                    accounts.find((account) => account.id === form.fromAccountId)
+                      ?.name ?? 'From account'
+                  }
+                  currentCents={balancePreview.from.current}
+                  afterCents={balancePreview.from.after}
+                />
+              ) : null}
+              {balancePreview.to ? (
+                <BalancePreviewBlock
+                  label={
+                    accounts.find((account) => account.id === form.toAccountId)?.name ??
+                    'To account'
+                  }
+                  currentCents={balancePreview.to.current}
+                  afterCents={balancePreview.to.after}
+                />
+              ) : null}
+            </>
+          ) : balancePreview.primary ? (
+            <BalancePreviewBlock
+              label={
+                accounts.find((account) => account.id === form.accountId)?.name ??
+                'Account'
+              }
+              currentCents={balancePreview.primary.current}
+              afterCents={balancePreview.primary.after}
+            />
+          ) : null}
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Date</span>

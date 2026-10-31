@@ -35,6 +35,7 @@ import {
   savingsRateDeltaPp,
 } from '../lib/savings'
 import { formatCents } from '../lib/money'
+import { amountColorClass, signedAmountColorClass } from '../lib/amount-colors'
 import { useDatabase } from '../hooks/useDatabase'
 import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
 
@@ -175,8 +176,14 @@ export function DashboardPage() {
       ? undefined
       : `${data.deltaPp >= 0 ? '+' : ''}${Math.round(data.deltaPp * 10) / 10} pp vs prior`
 
+  const netBalanceCents = savedCents(data.totals)
+
   const kpiItems = [
-    { label: 'Total balance', value: formatCents(data.balanceAtPeriodEnd) },
+    {
+      label: 'Total balance',
+      value: formatCents(data.balanceAtPeriodEnd),
+      valueClassName: 'text-yellow-400',
+    },
     ...(portfolio.holdings.length > 0
       ? [
           {
@@ -185,22 +192,30 @@ export function DashboardPage() {
               portfolio.totals.marketValueCents === null
                 ? '—'
                 : formatCents(portfolio.totals.marketValueCents),
-            hint:
-              portfolio.totals.marketValueCents !== null &&
-              portfolio.totals.marketValueCents - portfolio.totals.costBasisCents !== 0
-                ? `Unrealized ${formatCents(
-                    portfolio.totals.marketValueCents - portfolio.totals.costBasisCents,
-                  )}${portfolio.stale ? ' · stale quotes' : ''}`
-                : portfolio.stale
-                  ? 'Stale quotes'
-                  : undefined,
+            valueClassName: amountColorClass.transfer,
           },
         ]
       : []),
-    { label: 'Income', value: formatCents(data.totals.incomeCents) },
-    { label: 'Expenses', value: formatCents(data.totals.expenseCents) },
-    { label: 'Investments', value: formatCents(data.totals.investmentCents) },
-    { label: 'Saved', value: formatCents(savedCents(data.totals)) },
+    {
+      label: 'Income',
+      value: formatCents(data.totals.incomeCents),
+      valueClassName: amountColorClass.inflow,
+    },
+    {
+      label: 'Expenses',
+      value: formatCents(data.totals.expenseCents),
+      valueClassName: amountColorClass.outflow,
+    },
+    {
+      label: 'Investments',
+      value: formatCents(data.totals.investmentCents),
+      valueClassName: amountColorClass.outflow,
+    },
+    {
+      label: 'Net balance',
+      value: formatCents(netBalanceCents),
+      valueClassName: signedAmountColorClass(netBalanceCents),
+    },
     {
       label: 'Savings rate',
       value: formatSavingsRate(data.rate),

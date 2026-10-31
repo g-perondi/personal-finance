@@ -7,6 +7,9 @@ export function recurrenceKindForTransactionKind(
   if (kind === 'transfer') {
     return null
   }
+  if (kind === 'rebalancing') {
+    return null
+  }
   if (kind === 'income' || kind === 'expense' || kind === 'investment') {
     if (recurrenceKind !== 'recurring' && recurrenceKind !== 'variable') {
       throw new Error(

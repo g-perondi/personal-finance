@@ -59,7 +59,10 @@ public/
 | 4     | Global dashboard (year / month / day), wealth charts, savings rate          | Done    |
 | 5     | Documents (MVP), sidebar backup ZIP, list search, clear local data          | Done    |
 | 6     | ETF portfolio (holdings, WAC, live quotes without API key), `/investments`  | Done    |
-| 6+    | Recurring rules (scheduled generation), budget, sales / richer broker tools | Planned |
+| 7     | Balance reconcile (`rebalancing`), transaction modal balance preview        | Done    |
+| 7+    | Recurring rules (scheduled generation), budget, sales / richer broker tools | Planned |
+
+**Phase 7 (shipped):** **Reconcile balance** on Accounts creates a `rebalancing` ledger row; transaction add/edit modal shows **Current balance** and **Balance after entry** (including transfers).
 
 **Phase 6 (shipped):** `/investments` — ETF holdings with weighted average cost, opening positions and purchases (amount + NAV → units), linked `investment` ledger rows on buy, delayed third-party quotes fetched when you open Investments or click **Refresh quotes** (dashboard shows last cached prices only; no API key).
 

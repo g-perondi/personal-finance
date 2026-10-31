@@ -2,6 +2,8 @@ type KpiItem = {
   label: string
   value: string
   hint?: string
+  valueClassName?: string
+  hintClassName?: string
 }
 
 type KpiWidgetProps = {
@@ -22,11 +24,15 @@ export function KpiWidget({ items }: KpiWidgetProps) {
           <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
             {item.label}
           </p>
-          <p className="mt-1 text-base font-semibold text-white tabular-nums">
+          <p
+            className={`mt-1 text-base font-semibold tabular-nums ${item.valueClassName ?? 'text-white'}`}
+          >
             {item.value}
           </p>
           {item.hint ? (
-            <p className="mt-0.5 text-xs text-slate-500">{item.hint}</p>
+            <p className={`mt-0.5 text-xs ${item.hintClassName ?? 'text-slate-500'}`}>
+              {item.hint}
+            </p>
           ) : null}
         </div>
       ))}

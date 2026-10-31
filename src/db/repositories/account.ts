@@ -12,22 +12,16 @@ import {
   toUtcIsoString,
   utcNowIso,
   normalizeStoredCalendarUtc,
+  parseCalendarDateForStorage,
   romeCalendarDateToUtcIso,
 } from '../../lib/datetime'
 import type { AccountRecord, AccountWithBalance } from './model'
 
 export type { AccountWithBalance } from './model'
+import { TRANSACTION_SIGNED_DELTA_SQL } from '../types'
 import { TRANSACTION_TABLE } from './sql'
 
-const SIGNED_MOVEMENT_SUM_SQL = `
-  CASE
-    WHEN t.kind = 'income' THEN t.amount_cents
-    WHEN t.kind IN ('expense', 'investment') THEN -t.amount_cents
-    WHEN t.kind = 'transfer' AND t.transfer_leg = 'in' THEN t.amount_cents
-    WHEN t.kind = 'transfer' AND t.transfer_leg = 'out' THEN -t.amount_cents
-    ELSE 0
-  END
-`
+const SIGNED_MOVEMENT_SUM_SQL = TRANSACTION_SIGNED_DELTA_SQL
 
 const BALANCE_SUM_SQL = `
   COALESCE((
@@ -246,6 +240,53 @@ export function getAccountById(db: Database, id: string): AccountWithBalance | n
     ...mapAccountRow(row),
     balanceCents: Number(row.balance_cents),
   }
+}
+
+export function getAccountBalanceCents(db: Database, accountId: string): number {
+  const account = getAccountById(db, accountId)
+  if (!account) {
+    throw new Error('Account not found.')
+  }
+  return account.balanceCents
+}
+
+export type RebalanceAccountInput = {
+  accountId: string
+  targetBalanceCents: number
+  transactionDate: string
+  description?: string | null
+}
+
+export function rebalanceAccount(db: Database, input: RebalanceAccountInput): void {
+  if (input.targetBalanceCents < 0) {
+    throw new Error('Target balance cannot be negative.')
+  }
+  const current = getAccountBalanceCents(db, input.accountId)
+  const delta = input.targetBalanceCents - current
+  if (delta === 0) {
+    throw new Error('Target balance already matches the ledger.')
+  }
+  const direction = delta > 0 ? 'increase' : 'decrease'
+  const amountCents = Math.abs(delta)
+  const id = newId()
+  const createdAt = utcNowIso()
+  const transactionDate = parseCalendarDateForStorage(input.transactionDate)
+  db.run(
+    `INSERT INTO ${TRANSACTION_TABLE} (
+      id, account_id, kind, amount_cents, transfer_leg, transfer_id,
+      category_id, recurrence_kind, rebalancing_direction, transaction_date, description, created_at
+    ) VALUES (?, ?, 'rebalancing', ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?)`,
+    [
+      id,
+      input.accountId,
+      amountCents,
+      direction,
+      transactionDate,
+      input.description?.trim() || 'Balance reconciliation',
+      createdAt,
+    ],
+  )
+  schedulePersist()
 }
 
 export function countAccountTransactions(db: Database, accountId: string): number {

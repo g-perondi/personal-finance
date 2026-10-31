@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js'
-import type { RecurrenceKind, TransactionKind } from '../types'
+import type { RecurrenceKind, RebalancingDirection, TransactionKind } from '../types'
 import { recurrenceKindForTransactionKind } from '../recurrence'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
@@ -21,6 +21,16 @@ function mapRecurrenceKind(row: Record<string, unknown>): RecurrenceKind | null 
   return null
 }
 
+function mapRebalancingDirection(
+  row: Record<string, unknown>,
+): RebalancingDirection | null {
+  const raw = row.rebalancing_direction
+  if (raw === 'increase' || raw === 'decrease') {
+    return raw
+  }
+  return null
+}
+
 function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
   return {
     id: String(row.id),
@@ -31,6 +41,7 @@ function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
     transferId: row.transfer_id == null ? null : String(row.transfer_id),
     categoryId: row.category_id == null ? null : String(row.category_id),
     recurrenceKind: mapRecurrenceKind(row),
+    rebalancingDirection: mapRebalancingDirection(row),
     transactionDate: normalizeStoredCalendarUtc(String(row.transaction_date)),
     description: row.description == null ? null : String(row.description),
     createdAt: toUtcIsoString(String(row.created_at)),
@@ -47,6 +58,7 @@ const LIST_SELECT = `
     t.transfer_id,
     t.category_id,
     t.recurrence_kind,
+    t.rebalancing_direction,
     t.transaction_date,
     t.description,
     t.created_at,
@@ -150,8 +162,8 @@ export function createSimpleTransaction(
   db.run(
     `INSERT INTO ${TRANSACTION_TABLE} (
       id, account_id, kind, amount_cents, transfer_leg, transfer_id,
-      category_id, recurrence_kind, transaction_date, description, created_at
-    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`,
+      category_id, recurrence_kind, rebalancing_direction, transaction_date, description, created_at
+    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, NULL, ?, ?, ?)`,
     [
       id,
       input.accountId,
@@ -176,7 +188,7 @@ export function updateSimpleTransaction(
   },
 ): void {
   const existing = getTransactionById(db, id)
-  if (!existing || existing.kind === 'transfer') {
+  if (!existing || existing.kind === 'transfer' || existing.kind === 'rebalancing') {
     throw new Error('Transaction not found or not editable.')
   }
   if (input.amountCents <= 0) {

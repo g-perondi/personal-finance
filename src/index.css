@@ -47,10 +47,8 @@ select,
   min-height: 0;
 }
 
-/** Table cells and compact slots for EUR amounts (~1/8 of row width). */
+/** EUR amount cells: alignment only (width comes from `<col>` / table rules). */
 .money-cell {
-  width: 12.5%;
-  max-width: 12.5%;
   text-align: center;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -87,8 +85,25 @@ select,
   width: 100%;
 }
 
-.transactions-table col {
-  width: calc(100% / 8);
+.transactions-table col:not(.transactions-col-icon):not(.transactions-col-actions) {
+  width: calc((100% - 8.75rem) / 5);
+}
+
+.transactions-table col.transactions-col-icon {
+  width: 3.25rem;
+}
+
+.transactions-table col.transactions-col-actions {
+  width: 5.5rem;
+}
+
+.transactions-table .transactions-cell-icon {
+  padding-left: 0.75rem;
+  padding-right: 0.25rem;
+}
+
+.transactions-table .transactions-cell-actions {
+  padding-right: 1.25rem;
 }
 
 .transactions-table :is(th, td) {
@@ -102,10 +117,41 @@ select,
 }
 
 .transactions-table .money-cell {
-  width: calc(100% / 8);
-  max-width: none;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.transactions-table td.truncate {
+  max-width: 0;
+}
+
+.ledger-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.ledger-table col.ledger-col-icon {
+  width: 2.75rem;
+}
+
+.ledger-table col.ledger-col-amount {
+  width: 7.25rem;
+}
+
+.ledger-table col.ledger-col-date {
+  width: 5.75rem;
+}
+
+.ledger-table col.ledger-col-description {
+  width: calc(100% - 2.75rem - 7.25rem - 5.75rem);
+}
+
+.ledger-table .money-cell {
+  text-align: center;
+}
+
+.ledger-table td.truncate {
+  max-width: 0;
 }
 
 .documents-table {
@@ -168,6 +214,22 @@ select,
   border-radius: 0;
   max-height: none;
   flex: 1 1 0%;
+  min-width: 0;
+}
+
+.data-table-scroll-shell--embedded .ledger-table :is(th, td) {
+  padding-left: 0;
+  padding-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.data-table-scroll-shell--embedded .ledger-table tbody td:first-child {
+  padding-left: 0.75rem;
+}
+
+.data-table-scroll-shell--embedded .ledger-table th.money-cell,
+.data-table-scroll-shell--embedded .ledger-table td.money-cell {
+  padding-right: 0.25rem;
 }
 
 .data-table-scroll-shell .data-table thead th {

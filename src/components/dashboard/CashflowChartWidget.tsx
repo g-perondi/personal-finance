@@ -16,6 +16,7 @@ import {
   dashboardChartTooltipItemStyle,
   dashboardChartTooltipLabelStyle,
 } from './dashboardChartUi'
+import { amountChartColor } from '../../lib/amount-colors'
 
 export type CashflowChartPoint = {
   label: string
@@ -79,9 +80,9 @@ export function CashflowChartWidget({
                 cursor={dashboardBarChartTooltipCursor}
               />
               <Legend wrapperStyle={dashboardChartLegendWrapperStyle} />
-              <Bar dataKey="Income" fill="#22c55e" />
-              <Bar dataKey="Expenses" fill="#b91c1c" />
-              <Bar dataKey="Investments" fill="#60a5fa" />
+              <Bar dataKey="Income" fill={amountChartColor.inflow} />
+              <Bar dataKey="Expenses" fill={amountChartColor.outflow} />
+              <Bar dataKey="Investments" fill={amountChartColor.transfer} />
             </BarChart>
           </ResponsiveContainer>
         </div>

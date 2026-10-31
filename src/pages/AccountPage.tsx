@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Archive, Pencil, Plus } from 'lucide-react'
+import { Archive, Pencil, Plus, Scale } from 'lucide-react'
 import { Modal } from '../components/ui/Modal'
+import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import {
   archiveAccount,
   countAccountTransactions,
   createAccount,
   listAccounts,
+  rebalanceAccount,
   updateAccount,
   type AccountWithBalance,
 } from '../db/repositories/account'
@@ -39,6 +41,14 @@ export function AccountPage() {
   const [form, setForm] = useState<AccountFormState>(() => emptyForm())
   const [formError, setFormError] = useState<string | null>(null)
   const [txCount, setTxCount] = useState(0)
+  const [reconcileOpen, setReconcileOpen] = useState(false)
+  const [reconcileAccount, setReconcileAccount] = useState<AccountWithBalance | null>(
+    null,
+  )
+  const [reconcileNewBalance, setReconcileNewBalance] = useState('')
+  const [reconcileDate, setReconcileDate] = useState(() => todayRomeDateInputValue())
+  const [reconcileNote, setReconcileNote] = useState('')
+  const [reconcileError, setReconcileError] = useState<string | null>(null)
 
   const calendarYear = currentRomeYear()
 
@@ -107,6 +117,51 @@ export function AccountPage() {
     }
   }
 
+  function openReconcile(account: AccountWithBalance) {
+    setReconcileAccount(account)
+    setReconcileNewBalance(centsToInputValue(account.balanceCents))
+    setReconcileDate(todayRomeDateInputValue())
+    setReconcileNote('')
+    setReconcileError(null)
+    setReconcileOpen(true)
+  }
+
+  function handleReconcileSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!reconcileAccount) {
+      return
+    }
+    const targetCents = parseInputToCents(reconcileNewBalance)
+    if (targetCents === null) {
+      setReconcileError('Enter a valid balance.')
+      return
+    }
+    try {
+      rebalanceAccount(db, {
+        accountId: reconcileAccount.id,
+        targetBalanceCents: targetCents,
+        transactionDate: reconcileDate,
+        description: reconcileNote.trim() || null,
+      })
+      setReconcileOpen(false)
+      setReconcileAccount(null)
+      bump()
+    } catch (error: unknown) {
+      setReconcileError(error instanceof Error ? error.message : 'Reconcile failed.')
+    }
+  }
+
+  const reconcileAdjustmentCents = useMemo(() => {
+    if (!reconcileAccount) {
+      return null
+    }
+    const target = parseInputToCents(reconcileNewBalance)
+    if (target === null) {
+      return null
+    }
+    return target - reconcileAccount.balanceCents
+  }, [reconcileAccount, reconcileNewBalance])
+
   function handleArchive(account: AccountWithBalance) {
     if (!window.confirm(`Archive account "${account.name}"?`)) {
       return
@@ -171,6 +226,15 @@ export function AccountPage() {
                     <td className="truncate text-slate-400">{account.note ?? '—'}</td>
                     <td>
                       <div className="flex justify-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-emerald-300"
+                          aria-label={`Reconcile balance for ${account.name}`}
+                          title="Reconcile balance"
+                          onClick={() => openReconcile(account)}
+                        >
+                          <Scale className="size-4" />
+                        </button>
                         <button
                           type="button"
                           className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
@@ -263,6 +327,75 @@ export function AccountPage() {
             Save
           </button>
         </form>
+      </Modal>
+
+      <Modal
+        title="Reconcile balance"
+        open={reconcileOpen}
+        onClose={() => setReconcileOpen(false)}
+      >
+        {reconcileAccount ? (
+          <form className="flex flex-col gap-4" onSubmit={handleReconcileSubmit}>
+            <p className="text-sm text-slate-300">
+              Set the real balance for{' '}
+              <span className="font-medium text-white">{reconcileAccount.name}</span>. A
+              rebalancing entry will be created for the difference.
+            </p>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm">
+              <span className="text-slate-400">Current balance: </span>
+              <span className="font-medium text-white tabular-nums">
+                {formatCents(reconcileAccount.balanceCents)}
+              </span>
+            </div>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-slate-300">New balance (EUR)</span>
+              <input
+                required
+                value={reconcileNewBalance}
+                onChange={(event) => setReconcileNewBalance(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              />
+            </label>
+            {reconcileAdjustmentCents !== null && reconcileAdjustmentCents !== 0 ? (
+              <p className="text-sm text-slate-400">
+                Adjustment:{' '}
+                <span
+                  className={
+                    reconcileAdjustmentCents >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }
+                >
+                  {reconcileAdjustmentCents >= 0 ? '+' : ''}
+                  {formatCents(reconcileAdjustmentCents)}
+                </span>
+              </p>
+            ) : null}
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-slate-300">As of date</span>
+              <RomeCalendarDateInput
+                value={reconcileDate}
+                onChange={setReconcileDate}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-slate-300">Note (optional)</span>
+              <textarea
+                rows={2}
+                value={reconcileNote}
+                onChange={(event) => setReconcileNote(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              />
+            </label>
+            {reconcileError ? (
+              <p className="text-sm text-red-400">{reconcileError}</p>
+            ) : null}
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white"
+            >
+              Reconcile
+            </button>
+          </form>
+        ) : null}
       </Modal>
     </div>
   )

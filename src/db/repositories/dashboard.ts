@@ -1,5 +1,6 @@
 import type { Database } from 'sql.js'
-import type { TransactionKind } from '../types'
+import { TRANSACTION_SIGNED_DELTA_SQL } from '../types'
+import type { MonthTotals } from '../../lib/savings'
 import {
   currentRomeYear,
   daysInRomeMonth,
@@ -11,18 +12,10 @@ import {
   addMonthsToYearMonth,
   currentRomeYearMonth,
 } from '../../lib/datetime'
-import type { MonthTotals } from '../../lib/savings'
+import type { RebalancingDirection, TransactionKind } from '../types'
 import { TRANSACTION_TABLE } from './sql'
 
-const SIGNED_DELTA_SQL = `
-  CASE
-    WHEN t.kind = 'income' THEN t.amount_cents
-    WHEN t.kind IN ('expense', 'investment') THEN -t.amount_cents
-    WHEN t.kind = 'transfer' AND t.transfer_leg = 'in' THEN t.amount_cents
-    WHEN t.kind = 'transfer' AND t.transfer_leg = 'out' THEN -t.amount_cents
-    ELSE 0
-  END
-`
+const SIGNED_DELTA_SQL = TRANSACTION_SIGNED_DELTA_SQL
 
 export function getPeriodTotals(
   db: Database,
@@ -30,28 +23,32 @@ export function getPeriodTotals(
   endUtcExclusive: string,
 ): MonthTotals {
   const stmt = db.prepare(`
-    SELECT kind, COALESCE(SUM(amount_cents), 0) AS total
+    SELECT
+      COALESCE(SUM(CASE
+        WHEN kind = 'income'
+          OR (kind = 'rebalancing' AND rebalancing_direction = 'increase')
+        THEN amount_cents ELSE 0 END), 0) AS income_cents,
+      COALESCE(SUM(CASE
+        WHEN kind = 'expense'
+          OR (kind = 'rebalancing' AND rebalancing_direction = 'decrease')
+        THEN amount_cents ELSE 0 END), 0) AS expense_cents,
+      COALESCE(SUM(CASE WHEN kind = 'investment' THEN amount_cents ELSE 0 END), 0)
+        AS investment_cents
     FROM ${TRANSACTION_TABLE}
     WHERE transaction_date >= ? AND transaction_date < ?
-      AND kind IN ('income', 'expense', 'investment')
-    GROUP BY kind
   `)
   stmt.bind([startUtc, endUtcExclusive])
-  const totals: MonthTotals = { incomeCents: 0, expenseCents: 0, investmentCents: 0 }
-  while (stmt.step()) {
-    const row = stmt.getAsObject()
-    const kind = String(row.kind)
-    const total = Number(row.total)
-    if (kind === 'income') {
-      totals.incomeCents = total
-    } else if (kind === 'expense') {
-      totals.expenseCents = total
-    } else if (kind === 'investment') {
-      totals.investmentCents = total
-    }
+  if (!stmt.step()) {
+    stmt.free()
+    return { incomeCents: 0, expenseCents: 0, investmentCents: 0 }
   }
+  const row = stmt.getAsObject()
   stmt.free()
-  return totals
+  return {
+    incomeCents: Number(row.income_cents),
+    expenseCents: Number(row.expense_cents),
+    investmentCents: Number(row.investment_cents),
+  }
 }
 
 export type CashflowTrendPoint = {
@@ -154,6 +151,51 @@ export function getCumulativeInvestmentCentsAt(
   return invested
 }
 
+/** ETF cost basis from purchases recorded before `asOfUtcExclusive`. */
+export function getHoldingsCostBasisCentsAt(
+  db: Database,
+  asOfUtcExclusive: string,
+): number {
+  const stmt = db.prepare(`
+    SELECT COALESCE(SUM(p.amount_cents), 0) AS basis_cents
+    FROM holding_purchase p
+    INNER JOIN holding h ON h.id = p.holding_id
+    INNER JOIN account a ON a.id = h.account_id
+    WHERE a.archived_at IS NULL
+      AND a.opened_at < ?
+      AND p.purchase_date < ?
+  `)
+  stmt.bind([asOfUtcExclusive, asOfUtcExclusive])
+  stmt.step()
+  const basis = Number(stmt.getAsObject().basis_cents)
+  stmt.free()
+  return basis
+}
+
+/** Ledger investments not already counted via `holding_purchase.transaction_id`. */
+export function getOrphanInvestmentCentsAt(
+  db: Database,
+  asOfUtcExclusive: string,
+): number {
+  const stmt = db.prepare(`
+    SELECT COALESCE(SUM(t.amount_cents), 0) AS invested_cents
+    FROM ${TRANSACTION_TABLE} t
+    INNER JOIN account a ON a.id = t.account_id
+    WHERE a.archived_at IS NULL
+      AND a.opened_at < ?
+      AND t.kind = 'investment'
+      AND t.transaction_date < ?
+      AND NOT EXISTS (
+        SELECT 1 FROM holding_purchase hp WHERE hp.transaction_id = t.id
+      )
+  `)
+  stmt.bind([asOfUtcExclusive, asOfUtcExclusive])
+  stmt.step()
+  const invested = Number(stmt.getAsObject().invested_cents)
+  stmt.free()
+  return invested
+}
+
 export type WealthSeriesPoint = {
   key: string
   label: string
@@ -168,14 +210,17 @@ function wealthSeriesPointAt(
   label: string,
   asOfUtcExclusive: string,
 ): WealthSeriesPoint {
-  const totalCents = getTotalWealthCentsAt(db, asOfUtcExclusive)
-  const investmentCents = getCumulativeInvestmentCentsAt(db, asOfUtcExclusive)
+  const accountWealthCents = getTotalWealthCentsAt(db, asOfUtcExclusive)
+  const holdingsBasisCents = getHoldingsCostBasisCentsAt(db, asOfUtcExclusive)
+  const orphanInvestmentCents = getOrphanInvestmentCentsAt(db, asOfUtcExclusive)
+  const investmentCents = holdingsBasisCents + orphanInvestmentCents
+  const totalCents = accountWealthCents + holdingsBasisCents
   return {
     key,
     label,
     totalCents,
-    cashCents: totalCents - investmentCents,
     investmentCents,
+    cashCents: totalCents - investmentCents,
   }
 }
 
@@ -278,6 +323,7 @@ export type LedgerRow = {
   id: string
   kind: TransactionKind
   transferLeg: 'in' | 'out' | null
+  rebalancingDirection: RebalancingDirection | null
   amountCents: number
   transactionDate: string
   accountName: string
@@ -289,9 +335,9 @@ export type LedgerSign = 'in' | 'out'
 
 function signClause(sign: LedgerSign): string {
   if (sign === 'in') {
-    return `(t.kind = 'income' OR (t.kind = 'transfer' AND t.transfer_leg = 'in'))`
+    return `(t.kind = 'income' OR (t.kind = 'transfer' AND t.transfer_leg = 'in') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'increase'))`
   }
-  return `(t.kind IN ('expense', 'investment') OR (t.kind = 'transfer' AND t.transfer_leg = 'out'))`
+  return `(t.kind IN ('expense', 'investment') OR (t.kind = 'transfer' AND t.transfer_leg = 'out') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'decrease'))`
 }
 
 export function countLedgerInPeriod(
@@ -344,6 +390,7 @@ export function listLedgerInPeriod(
       t.id,
       t.kind,
       t.transfer_leg,
+      t.rebalancing_direction,
       t.amount_cents,
       t.transaction_date,
       t.description,
@@ -366,6 +413,11 @@ export function listLedgerInPeriod(
       id: String(row.id),
       kind: row.kind as TransactionKind,
       transferLeg: row.transfer_leg == null ? null : (row.transfer_leg as 'in' | 'out'),
+      rebalancingDirection:
+        row.rebalancing_direction === 'increase' ||
+        row.rebalancing_direction === 'decrease'
+          ? row.rebalancing_direction
+          : null,
       amountCents: Number(row.amount_cents),
       transactionDate: String(row.transaction_date),
       accountName: String(row.account_name),

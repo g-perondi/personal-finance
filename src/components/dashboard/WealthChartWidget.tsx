@@ -16,6 +16,7 @@ import {
   dashboardChartTooltipItemStyle,
   dashboardChartTooltipLabelStyle,
 } from './dashboardChartUi'
+import { wealthChartColor } from '../../lib/amount-colors'
 
 type WealthChartWidgetProps = {
   title: string
@@ -80,23 +81,24 @@ export function WealthChartWidget({
               <Legend wrapperStyle={dashboardChartLegendWrapperStyle} />
               <Line
                 type="monotone"
-                dataKey="Total"
-                stroke="#a78bfa"
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                type="monotone"
                 dataKey="Cash"
-                stroke="#22c55e"
+                stroke={wealthChartColor.cash}
                 strokeWidth={2}
                 dot={false}
               />
               <Line
                 type="monotone"
                 dataKey="Investment"
-                stroke="#60a5fa"
+                stroke={wealthChartColor.investment}
                 strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="Total"
+                stroke={wealthChartColor.total}
+                strokeWidth={2}
+                strokeDasharray="6 4"
                 dot={false}
               />
             </LineChart>

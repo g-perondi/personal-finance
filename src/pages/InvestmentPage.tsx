@@ -12,6 +12,7 @@ import {
 import { useDatabase } from '../hooks/useDatabase'
 import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
 import {
+  formatDateTimeInRome,
   formatItalianCalendarDateInRome,
   todayRomeDateInputValue,
 } from '../lib/datetime'
@@ -54,11 +55,32 @@ function formatPriceEur(price: number): string {
   }).format(price)
 }
 
+/** Unrealized move vs cost basis, e.g. +3% or -21%. */
+function formatUnrealizedPercent(
+  plCents: number,
+  costBasisCents: number,
+): string | null {
+  if (costBasisCents <= 0) {
+    return null
+  }
+  const pct = Math.round((plCents / costBasisCents) * 100)
+  return `${pct >= 0 ? '+' : ''}${pct}%`
+}
+
+function plToneClass(plCents: number | null): string {
+  if (plCents === null) {
+    return 'text-slate-400'
+  }
+  return plCents >= 0 ? 'text-emerald-400' : 'text-red-400'
+}
+
 type OpeningForm = {
   query: string
   accountId: string
+  openingDate: string
   quantity: string
-  totalCost: string
+  avgCostPerUnit: string
+  recordAsTransaction: boolean
 }
 
 type PurchaseForm = {
@@ -76,8 +98,10 @@ type PurchaseForm = {
 const emptyOpeningForm = (accountId: string): OpeningForm => ({
   query: '',
   accountId,
+  openingDate: todayRomeDateInputValue(),
   quantity: '',
-  totalCost: '',
+  avgCostPerUnit: '',
+  recordAsTransaction: true,
 })
 
 export function InvestmentPage() {
@@ -125,9 +149,9 @@ export function InvestmentPage() {
       ? null
       : totals.marketValueCents - totals.costBasisCents
 
-  const unrealizedPct =
-    unrealizedCents !== null && totals.costBasisCents > 0
-      ? (unrealizedCents / totals.costBasisCents) * 100
+  const unrealizedPercentLabel =
+    unrealizedCents !== null
+      ? formatUnrealizedPercent(unrealizedCents, totals.costBasisCents)
       : null
 
   async function handleLookup(query: string) {
@@ -186,7 +210,7 @@ export function InvestmentPage() {
       return
     }
     const quantity = parseQuantity(openingForm.quantity)
-    const totalCostCents = parseInputToCents(openingForm.totalCost)
+    const priceCentsPerUnit = parseInputToCents(openingForm.avgCostPerUnit)
     if (!openingForm.accountId) {
       setFormError('Select an account.')
       return
@@ -195,8 +219,13 @@ export function InvestmentPage() {
       setFormError('Enter a valid quantity.')
       return
     }
-    if (totalCostCents === null || totalCostCents <= 0) {
-      setFormError('Enter a valid total cost.')
+    if (priceCentsPerUnit === null || priceCentsPerUnit <= 0) {
+      setFormError('Enter a valid average cost per unit.')
+      return
+    }
+    const costBasisPreview = Math.round(quantity * priceCentsPerUnit)
+    if (costBasisPreview <= 0) {
+      setFormError('Quantity and price produce zero cost basis.')
       return
     }
     try {
@@ -207,8 +236,10 @@ export function InvestmentPage() {
           quoteSymbol: resolved.quoteSymbol,
           name: resolved.name,
         },
+        openingDate: openingForm.openingDate,
         quantity,
-        totalCostCents,
+        priceCentsPerUnit,
+        recordInvestmentTransaction: openingForm.recordAsTransaction,
       })
       setOpeningOpen(false)
       reloadHoldings()
@@ -354,7 +385,7 @@ export function InvestmentPage() {
           ) : null}
           {fetchedAt ? (
             <p className="mt-1 text-xs text-slate-500">
-              Last updated {formatItalianCalendarDateInRome(fetchedAt)}
+              Last updated {formatDateTimeInRome(fetchedAt)}
             </p>
           ) : null}
         </div>
@@ -370,23 +401,14 @@ export function InvestmentPage() {
           <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
             Unrealized P/L
           </p>
-          <p
-            className={`mt-1 text-xl font-semibold ${
-              unrealizedCents === null
-                ? 'text-slate-400'
-                : unrealizedCents >= 0
-                  ? 'text-emerald-400'
-                  : 'text-red-400'
-            }`}
-          >
-            {unrealizedCents === null
-              ? '—'
-              : `${formatCents(unrealizedCents)}${
-                  unrealizedPct === null
-                    ? ''
-                    : ` (${unrealizedPct >= 0 ? '+' : ''}${unrealizedPct.toFixed(1)}%)`
-                }`}
+          <p className={`mt-1 text-xl font-semibold ${plToneClass(unrealizedCents)}`}>
+            {unrealizedCents === null ? '—' : formatCents(unrealizedCents)}
           </p>
+          {unrealizedPercentLabel ? (
+            <p className={`mt-1 text-sm font-medium ${plToneClass(unrealizedCents)}`}>
+              {unrealizedPercentLabel}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -429,6 +451,10 @@ export function InvestmentPage() {
                     : Math.round(holding.quantity * lastPrice * 100)
                 const plCents =
                   mvCents === null ? null : mvCents - holding.totalCostCents
+                const plPercentLabel =
+                  plCents === null
+                    ? null
+                    : formatUnrealizedPercent(plCents, holding.totalCostCents)
                 return (
                   <tr key={holding.id} className="hover:bg-slate-900/50">
                     <td className="px-3 py-2">
@@ -454,15 +480,20 @@ export function InvestmentPage() {
                       {mvCents === null ? '—' : formatCents(mvCents)}
                     </td>
                     <td
-                      className={`px-3 py-2 text-right tabular-nums ${
-                        plCents === null
-                          ? 'text-slate-400'
-                          : plCents >= 0
-                            ? 'text-emerald-400'
-                            : 'text-red-400'
-                      }`}
+                      className={`px-3 py-2 text-right tabular-nums ${plToneClass(plCents)}`}
                     >
-                      {plCents === null ? '—' : formatCents(plCents)}
+                      {plCents === null ? (
+                        '—'
+                      ) : (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span>{formatCents(plCents)}</span>
+                          {plPercentLabel ? (
+                            <span className="text-xs font-medium">
+                              {plPercentLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="inline-flex gap-1">
@@ -586,6 +617,15 @@ export function InvestmentPage() {
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-400">Position opened</span>
+            <RomeCalendarDateInput
+              value={openingForm.openingDate}
+              onChange={(value) =>
+                setOpeningForm((prev) => ({ ...prev, openingDate: value }))
+              }
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Quantity (units)</span>
             <input
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
@@ -597,15 +637,51 @@ export function InvestmentPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-400">Total cost paid (EUR)</span>
+            <span className="text-slate-400">Average cost per unit (EUR)</span>
             <input
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
               inputMode="decimal"
-              value={openingForm.totalCost}
+              value={openingForm.avgCostPerUnit}
               onChange={(event) =>
-                setOpeningForm((prev) => ({ ...prev, totalCost: event.target.value }))
+                setOpeningForm((prev) => ({
+                  ...prev,
+                  avgCostPerUnit: event.target.value,
+                }))
               }
             />
+          </label>
+          {(() => {
+            const quantity = parseQuantity(openingForm.quantity)
+            const priceCents = parseInputToCents(openingForm.avgCostPerUnit)
+            if (quantity !== null && priceCents !== null && priceCents > 0) {
+              const basis = Math.round(quantity * priceCents)
+              return (
+                <p className="text-sm text-slate-500">
+                  Cost basis: {formatCents(basis)} · {formatQuantity(quantity)} units
+                </p>
+              )
+            }
+            return null
+          })()}
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 rounded border-slate-600 bg-slate-900"
+              checked={openingForm.recordAsTransaction}
+              onChange={(event) =>
+                setOpeningForm((prev) => ({
+                  ...prev,
+                  recordAsTransaction: event.target.checked,
+                }))
+              }
+            />
+            <span>
+              Record as investment transaction
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Reduces account balance and appears in cashflow for the cost basis
+                amount on the opening date.
+              </span>
+            </span>
           </label>
           {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
           <div className="flex justify-end gap-2">

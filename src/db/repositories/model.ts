@@ -2,6 +2,7 @@ import type { UtcIsoString } from '../../lib/datetime'
 import type {
   CategoryType,
   RecurrenceKind,
+  RebalancingDirection,
   TransactionKind,
   TransferLeg,
 } from '../types'
@@ -45,6 +46,7 @@ export type TransactionRecord = {
   transferId: string | null
   categoryId: string | null
   recurrenceKind: RecurrenceKind | null
+  rebalancingDirection: RebalancingDirection | null
   /** UTC ISO 8601 (start of calendar day in Europe/Rome) */
   transactionDate: UtcIsoString
   description: string | null
