@@ -1,0 +1,55 @@
+# Personal Finance
+
+Browser-only personal finance SPA: multi-account tracking, transfers, categorized expenses (recurring vs variable), a single global dashboard, and administrative documents. No backend, no authentication — all data stays on your machine (SQLite via sql.js + IndexedDB).
+
+## Stack
+
+- React 19 + Vite 8 + TypeScript
+- Tailwind CSS 4 + Lucide icons
+- sql.js (WASM at `public/sql-wasm.wasm`) + IndexedDB persistence (Phase 1+)
+- Recharts, react-router-dom, date-fns, fflate (backup)
+
+## Conventions
+
+- **Code and git messages:** English
+- **User-facing UI:** Italian
+- **Domain entity names:** always singular (`account`, `transaction`, `category`, …)
+
+See [`.cursor/rules/personal-finance.mdc`](.cursor/rules/personal-finance.mdc) and [`.cursor/docs/VERSIONS.md`](.cursor/docs/VERSIONS.md).
+
+## Scripts
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run preview
+```
+
+## Project layout
+
+```text
+src/
+  components/   # Shared UI (AppShell, …)
+  pages/        # Route pages (Italian copy)
+  db/           # sql.js, migrations, repositories (Phase 1+)
+  context/      # DbProvider (Phase 1+)
+  lib/          # money, dates, savings helpers
+public/
+  sql-wasm.wasm # sql.js runtime
+```
+
+## Roadmap
+
+| Phase | Scope |
+|-------|--------|
+| 0 | Scaffold, Cursor rules, framework docs snapshot (current) |
+| 1 | Database layer + multi-account schema |
+| 2 | Accounts, transactions, transfers |
+| 3 | Categories, recurring vs variable expenses |
+| 4 | Global dashboard + monthly savings rate |
+| 5+ | Recurring rules, budget, investments, documents, backup |
+
+## Data notice
+
+Data is stored only in this browser profile (IndexedDB). Use Settings backup (Phase 5+) before clearing site data or switching browsers.

@@ -1,0 +1,54 @@
+---
+description: Personal finance SPA — stack, architecture, domain overview, coding conventions
+alwaysApply: true
+---
+
+# Personal Finance
+
+## Product (high level)
+
+- Multiple **accounts** (e.g. Intesa, Trade Republic, Revolut), each with balance and movements.
+- **Transfers** between accounts (e.g. salary split to TR + rent on checking).
+- Expenses tied to an **account**; **categories** with **recurring vs variable** expense kinds.
+- **One global dashboard** only (no per-account dashboard).
+- Monthly view, savings rate vs prior months, estimates — built incrementally.
+- **Documents** with user-defined categories (empty by default) — later phases.
+- ETF/investments on investment-style accounts — later phases.
+
+Technical: **browser-only SPA**, no backend, no auth, **EUR**, local data (sql.js + IndexedDB). **UI copy in Italian.**
+
+## Stack (pinned versions)
+
+See [`.cursor/docs/VERSIONS.md`](../docs/VERSIONS.md). Before non-trivial framework usage, read the matching snapshot under [`.cursor/docs/`](../docs/).
+
+- React + Vite + TypeScript
+- Tailwind CSS + `lucide-react`
+- `sql.js` + IndexedDB (`public/sql-wasm.wasm`, `optimizeDeps.exclude: ['sql.js']`)
+- `recharts`, `react-router-dom`, `date-fns`, `fflate`
+
+## Code conventions
+
+- **English:** source code, file/folder names, identifiers, comments, commit messages, technical README.
+- **Italian:** user-visible strings only (labels, errors, empty states).
+- **Entity names always singular:** SQL tables (`account`, `transaction`, `transfer`, `category`, `document`, …), TS types (`Account`, …), repository modules (`src/db/repositories/account.ts`). FK columns: `account_id`, `category_id`.
+
+## Architecture
+
+- Repository layer owns SQL; no ad-hoc SQL in components.
+- Document file blobs in **IndexedDB**, metadata in SQLite (later).
+- Balances derived from movements + transfers unless an explicit opening balance on `account` is added.
+- Migrations in `src/db/migrations/`.
+
+## Implementation phases
+
+1. Database shell + multi-account schema  
+2. Account / transaction / transfer CRUD  
+3. Category + expense_kind  
+4. Global dashboard + savings metrics  
+5. Recurring rules, budget, documents, backup zip  
+
+Do **not** add: backend, auth, multi-currency (for now), per-account dashboard pages.
+
+## Routing (UI labels IT, paths)
+
+`/`, `/movimenti`, `/conti`, `/categorie`, `/documenti`, `/impostazioni` — shell in `AppShell`.
