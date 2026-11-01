@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
-import { Modal } from '../components/ui/Modal'
+import { FormSelect } from '../components/ui/FormSelect'
+import { Modal, ModalActions, ModalCancelOnly } from '../components/ui/Modal'
 import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import { listAccounts } from '../db/repositories/account'
 import {
@@ -80,7 +81,6 @@ type OpeningForm = {
   openingDate: string
   quantity: string
   avgCostPerUnit: string
-  recordAsTransaction: boolean
 }
 
 type PurchaseForm = {
@@ -101,7 +101,6 @@ const emptyOpeningForm = (accountId: string): OpeningForm => ({
   openingDate: todayRomeDateInputValue(),
   quantity: '',
   avgCostPerUnit: '',
-  recordAsTransaction: true,
 })
 
 export function InvestmentPage() {
@@ -239,7 +238,7 @@ export function InvestmentPage() {
         openingDate: openingForm.openingDate,
         quantity,
         priceCentsPerUnit,
-        recordInvestmentTransaction: openingForm.recordAsTransaction,
+        recordInvestmentTransaction: true,
       })
       setOpeningOpen(false)
       reloadHoldings()
@@ -602,19 +601,16 @@ export function InvestmentPage() {
           ) : null}
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Account</span>
-            <select
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            <FormSelect
               value={openingForm.accountId}
-              onChange={(event) =>
-                setOpeningForm((prev) => ({ ...prev, accountId: event.target.value }))
+              onChange={(accountId) =>
+                setOpeningForm((prev) => ({ ...prev, accountId }))
               }
-            >
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
+              options={accounts.map((account) => ({
+                value: account.id,
+                label: account.name,
+              }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Position opened</span>
@@ -663,43 +659,12 @@ export function InvestmentPage() {
             }
             return null
           })()}
-          <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              className="mt-1 size-4 rounded border-slate-600 bg-slate-900"
-              checked={openingForm.recordAsTransaction}
-              onChange={(event) =>
-                setOpeningForm((prev) => ({
-                  ...prev,
-                  recordAsTransaction: event.target.checked,
-                }))
-              }
-            />
-            <span>
-              Record as investment transaction
-              <span className="mt-0.5 block text-xs text-slate-500">
-                Reduces account balance and appears in cashflow for the cost basis
-                amount on the opening date.
-              </span>
-            </span>
-          </label>
           {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:text-white"
-              onClick={() => setOpeningOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-              onClick={handleSaveOpening}
-            >
-              Save
-            </button>
-          </div>
+          <ModalActions
+            onCancel={() => setOpeningOpen(false)}
+            submitType="button"
+            onSubmit={handleSaveOpening}
+          />
         </div>
       </Modal>
 
@@ -767,25 +732,14 @@ export function InvestmentPage() {
               return null
             })()}
             {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:text-white"
-                onClick={() => {
-                  setPurchaseOpen(false)
-                  setPurchaseForm(null)
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-                onClick={handleSavePurchase}
-              >
-                Save
-              </button>
-            </div>
+            <ModalActions
+              onCancel={() => {
+                setPurchaseOpen(false)
+                setPurchaseForm(null)
+              }}
+              submitType="button"
+              onSubmit={handleSavePurchase}
+            />
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -800,6 +754,12 @@ export function InvestmentPage() {
                 {holding.instrumentName} · {holding.accountName}
               </button>
             ))}
+            <ModalCancelOnly
+              onCancel={() => {
+                setPurchaseOpen(false)
+                setPurchaseForm(null)
+              }}
+            />
           </div>
         )}
       </Modal>
@@ -830,22 +790,15 @@ export function InvestmentPage() {
             spellCheck={false}
           />
         </label>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:text-white"
-            onClick={closeDeleteHoldingModal}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
-            disabled={deleteConfirmText !== DELETE_HOLDING_CONFIRM_PHRASE}
-            onClick={confirmDeleteHolding}
-          >
-            Remove
-          </button>
+        <div className="mt-6">
+          <ModalActions
+            onCancel={closeDeleteHoldingModal}
+            submitLabel="Remove"
+            submitType="button"
+            submitDisabled={deleteConfirmText !== DELETE_HOLDING_CONFIRM_PHRASE}
+            onSubmit={confirmDeleteHolding}
+            submitClassName="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+          />
         </div>
       </Modal>
     </div>
