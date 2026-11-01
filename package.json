@@ -10,7 +10,7 @@
     "build:electron": "tsc -b && vite build --base ./",
     "icons": "node scripts/generate-icon.mjs",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=1 electron .\"",
-    "electron:build": "npm run icons && npm run build:electron && electron-builder",
+    "electron:build": "node scripts/electron-prebuild.mjs && npm run icons && npm run build:electron && electron-builder",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write .",
@@ -23,7 +23,7 @@
     "productName": "Personal Finance",
     "icon": "build/icon.png",
     "directories": {
-      "output": "release",
+      "output": "artifacts",
       "buildResources": "build"
     },
     "files": [

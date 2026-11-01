@@ -32,19 +32,19 @@ npm run lint:fix      # Oxlint auto-fix where supported
 
 ### Desktop (Electron, Windows)
 
-Packaged app for daily use on your PC (no Node server while using the app). Data stays local in the app’s Chromium profile (IndexedDB), separate from Chrome/Edge.
+Packaged app for daily use on your PC (no Node server while using the app). Data stays local in the app’s Chromium profile (IndexedDB), separate from Chrome/Edge. The desktop build serves the UI at a **fixed** `http://127.0.0.1:39217` origin so IndexedDB survives restarts (do not change that port in `electron/main.mjs` without a migration plan).
 
 **Prerequisites:** Node.js for building only.
 
 ```bash
 npm run electron:dev     # Vite + Electron window (http://localhost:5173)
 npm run build:electron   # Frontend build with relative asset paths (./)
-npm run electron:build   # build:electron + Windows portable .exe under release/
+npm run electron:build   # build:electron + Windows portable .exe under artifacts/
 ```
 
 **Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app.
 
-**After code changes:** run `npm run electron:build` and replace the shortcut or portable exe in `release/`.
+**After code changes:** run `npm run electron:build` and replace the shortcut or portable exe in `artifacts/`.
 
 ## Code style
 
