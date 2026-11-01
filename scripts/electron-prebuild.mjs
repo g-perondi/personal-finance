@@ -28,7 +28,7 @@ async function removeArtifactsWithRetry(maxAttempts = 5) {
       }
       if (attempt === maxAttempts) {
         console.error(
-          'Could not clear artifacts/: close Personal Finance, Explorer windows on that folder, and any open files under release/ or artifacts/.',
+          'Could not clear artifacts/: quit Personal Finance, close any file manager on that folder, and retry.',
         )
         throw error
       }

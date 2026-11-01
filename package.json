@@ -1,7 +1,7 @@
 {
   "name": "personal-finance",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "main": "electron/main.mjs",
   "scripts": {
@@ -9,8 +9,12 @@
     "build": "tsc -b && vite build",
     "build:electron": "tsc -b && vite build --base ./",
     "icons": "node scripts/generate-icon.mjs",
-    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=1 electron .\"",
-    "electron:build": "node scripts/electron-prebuild.mjs && npm run icons && npm run build:electron && electron-builder",
+    "electron:start": "wait-on http://localhost:5173 && cross-env ELECTRON_DEV=1 electron .",
+    "electron:dev": "concurrently -k \"npm run dev\" \"npm run electron:start\"",
+    "electron:pack": "node scripts/electron-prebuild.mjs && npm run icons && npm run build:electron",
+    "electron:build": "npm run electron:build:win",
+    "electron:build:win": "npm run electron:pack && electron-builder --win",
+    "electron:build:mac": "npm run electron:pack && electron-builder --mac",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write .",
@@ -35,6 +39,14 @@
       "target": [
         "portable"
       ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "identity": null
     }
   },
   "lint-staged": {
