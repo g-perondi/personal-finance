@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { DashboardPeriodToolbar } from '../components/dashboard/DashboardPeriodToolbar'
 import { DashboardScopeBar } from '../components/dashboard/DashboardScopeBar'
@@ -9,8 +9,11 @@ import {
 import {
   TransactionKindDisplay,
   TransactionAmountDisplay,
+  transactionKindLabel,
 } from '../components/transactions/TransactionKindDisplay'
-import { Modal } from '../components/ui/Modal'
+import { FormSelect } from '../components/ui/FormSelect'
+import { Modal, ModalActions } from '../components/ui/Modal'
+import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import { getEarliestAccountYearInRome, listAccounts } from '../db/repositories/account'
 import { listCategories } from '../db/repositories/category'
 import type { TransactionListItem, TransactionRecord } from '../db/repositories/model'
@@ -59,6 +62,29 @@ type FormState = {
   description: string
   categoryId: string
   recurrenceKind: RecurrenceKind | ''
+}
+
+type LastCreateDefaults = Pick<
+  FormState,
+  | 'kind'
+  | 'accountId'
+  | 'fromAccountId'
+  | 'toAccountId'
+  | 'amount'
+  | 'description'
+  | 'categoryId'
+  | 'recurrenceKind'
+>
+
+function pickExistingAccountId(
+  preferred: string,
+  accountIds: Set<string>,
+  fallback: string,
+): string {
+  if (preferred && accountIds.has(preferred)) {
+    return preferred
+  }
+  return fallback
 }
 
 function entryKindNeedsRecurrence(kind: EntryKind): boolean {
@@ -135,6 +161,9 @@ export function TransactionPage() {
   )
   const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<TransactionListItem | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const lastCreateDefaultsRef = useRef<LastCreateDefaults | null>(null)
 
   const earliestYear = useMemo(() => getEarliestAccountYearInRome(db), [db])
   const bounds = useMemo(
@@ -179,14 +208,34 @@ export function TransactionPage() {
     const firstAccount = accounts[0]?.id ?? ''
     const secondAccount =
       accounts.find((account) => account.id !== firstAccount)?.id ?? ''
-    setForm({
-      ...emptyForm(),
-      kind: 'expense',
-      accountId: firstAccount,
-      fromAccountId: firstAccount,
-      toAccountId: secondAccount,
-      recurrenceKind: 'variable',
-    })
+    const accountIds = new Set(accounts.map((account) => account.id))
+    const last = lastCreateDefaultsRef.current
+    if (last) {
+      setForm({
+        ...emptyForm(),
+        kind: last.kind,
+        accountId: pickExistingAccountId(last.accountId, accountIds, firstAccount),
+        fromAccountId: pickExistingAccountId(
+          last.fromAccountId,
+          accountIds,
+          firstAccount,
+        ),
+        toAccountId: pickExistingAccountId(last.toAccountId, accountIds, secondAccount),
+        amount: last.amount,
+        description: last.description,
+        categoryId: last.categoryId,
+        recurrenceKind: last.recurrenceKind || 'variable',
+      })
+    } else {
+      setForm({
+        ...emptyForm(),
+        kind: 'expense',
+        accountId: firstAccount,
+        fromAccountId: firstAccount,
+        toAccountId: secondAccount,
+        recurrenceKind: 'variable',
+      })
+    }
     setError(null)
     setModalOpen(true)
   }
@@ -214,7 +263,7 @@ export function TransactionPage() {
       date: utcIsoToRomeDateInputValue(tx.transactionDate),
       description: tx.description ?? '',
       categoryId: tx.categoryId ?? '',
-      recurrenceKind: tx.recurrenceKind ?? '',
+      recurrenceKind: tx.recurrenceKind === 'recurring' ? 'recurring' : 'variable',
     })
     setError(null)
     setModalOpen(true)
@@ -263,19 +312,30 @@ export function TransactionPage() {
     openEditSimple(tx)
   }
 
-  function handleDelete(tx: TransactionListItem) {
-    if (!window.confirm('Delete this entry?')) {
+  function closeDeleteModal() {
+    setDeleteTarget(null)
+    setDeleteError(null)
+  }
+
+  function openDeleteModal(tx: TransactionListItem) {
+    setDeleteError(null)
+    setDeleteTarget(tx)
+  }
+
+  function confirmDeleteEntry() {
+    if (!deleteTarget) {
       return
     }
     try {
-      if (tx.kind === 'transfer' && tx.transferId) {
-        deleteTransfer(db, tx.transferId)
+      if (deleteTarget.kind === 'transfer' && deleteTarget.transferId) {
+        deleteTransfer(db, deleteTarget.transferId)
       } else {
-        deleteSimpleTransaction(db, tx.id)
+        deleteSimpleTransaction(db, deleteTarget.id)
       }
+      closeDeleteModal()
       bump()
     } catch (err: unknown) {
-      window.alert(err instanceof Error ? err.message : 'Delete failed.')
+      setDeleteError(err instanceof Error ? err.message : 'Delete failed.')
     }
   }
 
@@ -286,8 +346,13 @@ export function TransactionPage() {
       setError('Enter a valid amount.')
       return
     }
+    if (!form.date.trim()) {
+      setError('Enter a valid date.')
+      return
+    }
 
     try {
+      const creating = !editingTxId && !editingTransferId
       if (form.kind === 'transfer') {
         if (!form.fromAccountId || !form.toAccountId) {
           setError('Select both accounts.')
@@ -310,10 +375,11 @@ export function TransactionPage() {
           setError('Select an account.')
           return
         }
-        if (entryKindNeedsRecurrence(form.kind) && !form.recurrenceKind) {
-          setError('Select recurrence (recurring or variable).')
-          return
-        }
+        const recurrenceKind = entryKindNeedsRecurrence(form.kind)
+          ? form.recurrenceKind === 'recurring'
+            ? 'recurring'
+            : 'variable'
+          : null
         const payload = {
           accountId: form.accountId,
           kind: form.kind,
@@ -321,12 +387,28 @@ export function TransactionPage() {
           transactionDate: form.date,
           description: form.description,
           categoryId: form.categoryId || null,
-          recurrenceKind: form.recurrenceKind || null,
+          recurrenceKind,
         }
         if (editingTxId) {
           updateSimpleTransaction(db, editingTxId, payload)
         } else {
           createSimpleTransaction(db, payload)
+        }
+      }
+      if (creating) {
+        lastCreateDefaultsRef.current = {
+          kind: form.kind,
+          accountId: form.accountId,
+          fromAccountId: form.fromAccountId,
+          toAccountId: form.toAccountId,
+          amount: form.amount,
+          description: form.description,
+          categoryId: form.categoryId,
+          recurrenceKind: entryKindNeedsRecurrence(form.kind)
+            ? form.recurrenceKind === 'recurring'
+              ? 'recurring'
+              : 'variable'
+            : '',
         }
       }
       setModalOpen(false)
@@ -345,6 +427,25 @@ export function TransactionPage() {
     }
     return false
   })
+
+  const accountSelectOptions = useMemo(
+    () => [
+      { value: '', label: 'Select account' },
+      ...accounts.map((account) => ({ value: account.id, label: account.name })),
+    ],
+    [accounts],
+  )
+
+  const categorySelectOptions = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...filteredCategories.map((category) => ({
+        value: category.id,
+        label: category.name,
+      })),
+    ],
+    [filteredCategories],
+  )
 
   const isEditing = editingTxId !== null || editingTransferId !== null
   const addDisabled = accounts.length === 0
@@ -478,21 +579,32 @@ export function TransactionPage() {
       </header>
 
       {accounts.length > 0 ? (
-        <label className="relative mb-4 block shrink-0">
-          <span className="sr-only">Search transactions</span>
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search description, account, category…"
-            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 py-2 pr-3 pl-10 text-sm text-white placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
-            autoComplete="off"
-          />
-        </label>
+        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Search transactions</span>
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search description, account, category…"
+              className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 py-2 pr-3 pl-10 text-sm text-white placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+              autoComplete="off"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={addDisabled}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white disabled:opacity-50"
+            onClick={() => openCreate()}
+          >
+            <Plus className="size-4" aria-hidden />
+            Add
+          </button>
+        </div>
       ) : null}
 
       <div className="app-page-scroll-ceiling">
@@ -578,7 +690,7 @@ export function TransactionPage() {
                           type="button"
                           className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-red-300"
                           aria-label="Delete entry"
-                          onClick={() => handleDelete(tx)}
+                          onClick={() => openDeleteModal(tx)}
                         >
                           <Trash2 className="size-4" />
                         </button>
@@ -591,16 +703,6 @@ export function TransactionPage() {
           </div>
         ) : null}
       </div>
-
-      <button
-        type="button"
-        disabled={addDisabled}
-        className="absolute right-8 bottom-8 z-10 inline-flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-900 shadow-lg shadow-black/40 hover:bg-white disabled:opacity-50"
-        aria-label="Add entry"
-        onClick={() => openCreate()}
-      >
-        <Plus className="size-6" aria-hidden />
-      </button>
 
       <Modal
         title={addEntryModalTitle(editingTxId, editingTransferId)}
@@ -622,59 +724,32 @@ export function TransactionPage() {
             <>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-300">From account</span>
-                <select
-                  required
+                <FormSelect
                   value={form.fromAccountId}
-                  onChange={(event) =>
-                    setForm({ ...form, fromAccountId: event.target.value })
-                  }
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                >
-                  <option value="">Select account</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(fromAccountId) => setForm({ ...form, fromAccountId })}
+                  options={accountSelectOptions}
+                  placeholder="Select account"
+                />
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-300">To account</span>
-                <select
-                  required
+                <FormSelect
                   value={form.toAccountId}
-                  onChange={(event) =>
-                    setForm({ ...form, toAccountId: event.target.value })
-                  }
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                >
-                  <option value="">Select account</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(toAccountId) => setForm({ ...form, toAccountId })}
+                  options={accountSelectOptions}
+                  placeholder="Select account"
+                />
               </label>
             </>
           ) : (
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-300">Account</span>
-              <select
-                required
+              <FormSelect
                 value={form.accountId}
-                onChange={(event) =>
-                  setForm({ ...form, accountId: event.target.value })
-                }
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-              >
-                <option value="">Select account</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(accountId) => setForm({ ...form, accountId })}
+                options={accountSelectOptions}
+                placeholder="Select account"
+              />
             </label>
           )}
 
@@ -684,9 +759,67 @@ export function TransactionPage() {
               required
               value={form.amount}
               onChange={(event) => setForm({ ...form, amount: event.target.value })}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="form-field"
             />
           </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-300">Description</span>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(event) =>
+                setForm({ ...form, description: event.target.value })
+              }
+              className="form-field"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-300">Date</span>
+            <RomeCalendarDateInput
+              value={form.date}
+              onChange={(date) => setForm({ ...form, date })}
+            />
+          </label>
+
+          {form.kind !== 'transfer' ? (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-slate-300">Category (optional)</span>
+              <FormSelect
+                value={form.categoryId}
+                onChange={(categoryId) => {
+                  const category = categories.find((row) => row.id === categoryId)
+                  setForm((current) => ({
+                    ...current,
+                    categoryId,
+                    recurrenceKind:
+                      category?.defaultRecurrenceKind ??
+                      (current.recurrenceKind || 'variable'),
+                  }))
+                }}
+                options={categorySelectOptions}
+                placeholder="None"
+              />
+            </label>
+          ) : null}
+
+          {entryKindNeedsRecurrence(form.kind) ? (
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                className="form-checkbox"
+                checked={form.recurrenceKind === 'recurring'}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    recurrenceKind: event.target.checked ? 'recurring' : 'variable',
+                  })
+                }
+              />
+              <span>Recurrent</span>
+            </label>
+          ) : null}
 
           {form.kind === 'transfer' ? (
             <>
@@ -722,86 +855,78 @@ export function TransactionPage() {
             />
           ) : null}
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-300">Date</span>
-            <input
-              type="date"
-              required
-              value={form.date}
-              onChange={(event) => setForm({ ...form, date: event.target.value })}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-            />
-          </label>
-
-          {entryKindNeedsRecurrence(form.kind) ? (
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-300">Recurrence</span>
-              <select
-                required
-                value={form.recurrenceKind}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    recurrenceKind: event.target.value as RecurrenceKind,
-                  })
-                }
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-              >
-                <option value="">Select…</option>
-                <option value="recurring">Recurring</option>
-                <option value="variable">Variable</option>
-              </select>
-            </label>
-          ) : null}
-
-          {form.kind !== 'transfer' ? (
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-300">Category (optional)</span>
-              <select
-                value={form.categoryId}
-                onChange={(event) => {
-                  const categoryId = event.target.value
-                  const category = categories.find((row) => row.id === categoryId)
-                  setForm((current) => ({
-                    ...current,
-                    categoryId,
-                    recurrenceKind:
-                      (category?.defaultRecurrenceKind ?? current.recurrenceKind) ||
-                      'variable',
-                  }))
-                }}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-              >
-                <option value="">None</option>
-                {filteredCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-300">Description</span>
-            <textarea
-              rows={2}
-              value={form.description}
-              onChange={(event) =>
-                setForm({ ...form, description: event.target.value })
-              }
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-            />
-          </label>
-
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white"
-          >
-            Save
-          </button>
+          <ModalActions onCancel={() => setModalOpen(false)} />
         </form>
+      </Modal>
+
+      <Modal
+        title="Delete entry"
+        open={deleteTarget !== null}
+        onClose={closeDeleteModal}
+      >
+        {deleteTarget ? (
+          <>
+            <p className="text-sm text-slate-300">
+              {deleteTarget.kind === 'transfer' && deleteTarget.transferId
+                ? 'Remove this transfer? Both legs will be deleted.'
+                : 'Remove this entry from your ledger? You cannot undo this.'}
+            </p>
+            <dl className="mt-4 space-y-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Type</dt>
+                <dd className="text-right text-slate-200">
+                  {transactionKindLabel(deleteTarget.kind, deleteTarget.transferLeg)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Amount</dt>
+                <dd className="text-right text-slate-200 tabular-nums">
+                  <TransactionAmountDisplay
+                    kind={deleteTarget.kind}
+                    transferLeg={deleteTarget.transferLeg}
+                    rebalancingDirection={deleteTarget.rebalancingDirection}
+                    amountCents={deleteTarget.amountCents}
+                  />
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Date</dt>
+                <dd className="text-right text-slate-200">
+                  {formatCalendarDateInRome(deleteTarget.transactionDate)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Account</dt>
+                <dd className="max-w-[14rem] truncate text-right text-slate-200">
+                  {deleteTarget.accountName}
+                </dd>
+              </div>
+              {deleteTarget.description ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="shrink-0 text-slate-500">Description</dt>
+                  <dd className="max-w-[14rem] truncate text-right text-slate-200">
+                    {deleteTarget.description}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            {deleteError ? (
+              <p className="mt-3 text-sm text-red-400" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
+            <div className="mt-6">
+              <ModalActions
+                onCancel={closeDeleteModal}
+                submitLabel="Delete"
+                submitType="button"
+                onSubmit={confirmDeleteEntry}
+                submitClassName="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+              />
+            </div>
+          </>
+        ) : null}
       </Modal>
     </div>
   )
