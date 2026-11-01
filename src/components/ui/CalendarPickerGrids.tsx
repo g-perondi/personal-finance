@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { format } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { FORM_PICKER_OPTION, FORM_PICKER_OPTION_SELECTED } from './formPickerUi'
+import { APP_SCROLLBAR_CLASS } from '../../lib/scroll-ui'
 import { currentRomeYear } from '../../lib/datetime'
 
 export type CalendarPickerBounds = {
@@ -35,7 +36,9 @@ export function CalendarYearGrid({
   }, [bounds.maxYear, bounds.minYear])
 
   return (
-    <div className="grid max-h-52 w-56 grid-cols-3 gap-1.5 overflow-y-auto p-0.5">
+    <div
+      className={`grid max-h-52 w-56 grid-cols-3 gap-1.5 overflow-y-auto p-0.5 ${APP_SCROLLBAR_CLASS}`}
+    >
       {years.map((year) => (
         <button
           key={year}

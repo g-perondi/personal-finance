@@ -14,7 +14,7 @@ import {
 } from './CalendarPickerGrids'
 import { FORM_PICKER_PANEL_CLASS } from './formPickerUi'
 import {
-  DISPLAY_TIME_ZONE,
+  getDisplayTimeZone,
   formatRomeCalendarDateInputItalian,
   parseItalianCalendarDateInput,
   todayRomeDateInputValue,
@@ -33,6 +33,7 @@ type RomeCalendarDateInputProps = {
   placeholder?: string
   className?: string
   inputClassName?: string
+  invalid?: boolean
 }
 
 type PickerPosition = {
@@ -42,11 +43,11 @@ type PickerPosition = {
 
 function calendarDateToDate(calendarDate: string): Date {
   const [y, m, d] = calendarDate.split('-').map(Number)
-  return new TZDateMini(y!, m! - 1, d!, DISPLAY_TIME_ZONE)
+  return new TZDateMini(y!, m! - 1, d!, getDisplayTimeZone())
 }
 
 function dateToCalendarDate(date: Date): string {
-  const inRome = new TZDateMini(date, DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(date, getDisplayTimeZone())
   return format(inRome, 'yyyy-MM-dd')
 }
 
@@ -93,6 +94,7 @@ export function RomeCalendarDateInput({
   placeholder = 'dd/mm/yyyy',
   className = '',
   inputClassName = 'form-field',
+  invalid = false,
 }: RomeCalendarDateInputProps) {
   const generatedId = useId()
   const id = idProp ?? generatedId
@@ -210,12 +212,12 @@ export function RomeCalendarDateInput({
 
   function shiftViewMonth(delta: number) {
     setViewMonth((current) => {
-      const inRome = new TZDateMini(current, DISPLAY_TIME_ZONE)
+      const inRome = new TZDateMini(current, getDisplayTimeZone())
       const next = new TZDateMini(
         inRome.getFullYear(),
         inRome.getMonth() + delta,
         1,
-        DISPLAY_TIME_ZONE,
+        getDisplayTimeZone(),
       )
       setViewYear(next.getFullYear())
       return next
@@ -225,8 +227,8 @@ export function RomeCalendarDateInput({
   function handleYearSelect(year: number) {
     setViewYear(year)
     setViewMonth((current) => {
-      const inRome = new TZDateMini(current, DISPLAY_TIME_ZONE)
-      return new TZDateMini(year, inRome.getMonth(), 1, DISPLAY_TIME_ZONE)
+      const inRome = new TZDateMini(current, getDisplayTimeZone())
+      return new TZDateMini(year, inRome.getMonth(), 1, getDisplayTimeZone())
     })
     setPanelMode('months')
   }
@@ -235,12 +237,12 @@ export function RomeCalendarDateInput({
     const year = Number(yearMonth.slice(0, 4))
     const monthIndex = Number(yearMonth.slice(5, 7)) - 1
     setViewYear(year)
-    setViewMonth(new TZDateMini(year, monthIndex, 1, DISPLAY_TIME_ZONE))
+    setViewMonth(new TZDateMini(year, monthIndex, 1, getDisplayTimeZone()))
     setPanelMode('days')
   }
 
   const selected = value ? calendarDateToDate(value) : undefined
-  const viewMonthRome = new TZDateMini(viewMonth, DISPLAY_TIME_ZONE)
+  const viewMonthRome = new TZDateMini(viewMonth, getDisplayTimeZone())
   const minYearMonth = `${bounds.minYear}-01`
   const maxYearMonth = `${bounds.maxYear}-12`
   const canPrevMonth = selectedYearMonth > minYearMonth
@@ -363,7 +365,7 @@ export function RomeCalendarDateInput({
               setFocused(false)
             }
           }}
-          className={`min-w-0 flex-1 ${inputClassName}`}
+          className={`min-w-0 flex-1 ${inputClassName}${invalid ? 'form-field--invalid' : ''}`}
         />
         <button
           ref={anchorRef}

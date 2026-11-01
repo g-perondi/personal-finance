@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { FormSelect } from '../components/ui/FormSelect'
 import { Modal, ModalActions, ModalCancelOnly } from '../components/ui/Modal'
+import { FormError } from '../components/ui/FormError'
+import { OverflowTooltip } from '../components/ui/OverflowTooltip'
 import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import { listAccounts } from '../db/repositories/account'
 import {
+  computePortfolioTotals,
   createOpeningHolding,
   deleteHolding,
+  deleteHoldingPurchase,
   listRecentHoldingPurchases,
   recordHoldingPurchase,
+  updateHoldingPurchase,
 } from '../db/repositories/holding'
 import { useDatabase } from '../hooks/useDatabase'
 import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
@@ -16,12 +21,78 @@ import {
   formatDateTimeInRome,
   formatItalianCalendarDateInRome,
   todayRomeDateInputValue,
+  utcIsoToRomeDateInputValue,
 } from '../lib/datetime'
-import { resolveInstrument } from '../lib/market-quotes'
+import type { InstrumentAssetKind } from '../db/repositories/model'
+import {
+  fetchQuotesForInstruments,
+  parseIsinFromQuery,
+  searchInstrumentListings,
+} from '../lib/market-quotes'
 import type { ResolvedInstrument } from '../lib/market-quotes/types'
-import { formatCents, parseInputToCents } from '../lib/money'
+import {
+  formatCents,
+  formatUnitPriceEur,
+  centsToInputValue,
+  parseInputToCents,
+  parseInputToUnitPriceCents,
+  unitPriceEurToInputValue,
+} from '../lib/money'
+import { APP_SCROLLBAR_CLASS } from '../lib/scroll-ui'
 
 const DELETE_HOLDING_CONFIRM_PHRASE = 'delete position'
+
+const ASSET_TABS: { id: InstrumentAssetKind; label: string }[] = [
+  { id: 'etf', label: 'ETF' },
+  { id: 'equity', label: 'Stocks' },
+  { id: 'crypto', label: 'Crypto' },
+]
+
+function lookupFieldLabel(assetKind: InstrumentAssetKind): string {
+  if (assetKind === 'crypto') {
+    return 'Name or symbol'
+  }
+  return 'ISIN or ticker'
+}
+
+function addPositionButtonLabel(assetKind: InstrumentAssetKind): string {
+  if (assetKind === 'etf') {
+    return 'Add ETF'
+  }
+  if (assetKind === 'equity') {
+    return 'Add stock'
+  }
+  return 'Add crypto'
+}
+
+function emptyHoldingsMessage(assetKind: InstrumentAssetKind): string {
+  if (assetKind === 'etf') {
+    return 'No ETF holdings yet. Add an opening position to get started.'
+  }
+  if (assetKind === 'equity') {
+    return 'No stock holdings yet. Add an opening position to get started.'
+  }
+  return 'No crypto holdings yet. Add an opening position to get started.'
+}
+
+function resolveListingIsin(
+  listing: ResolvedInstrument,
+  lookupQuery: string,
+): string | null {
+  return listing.isin ?? parseIsinFromQuery(lookupQuery)
+}
+
+function formatListingLastPrice(
+  quoteSymbol: string,
+  quoteBySymbol: Map<string, number>,
+  quotesLoading: boolean,
+): string {
+  if (quotesLoading && !quoteBySymbol.has(quoteSymbol)) {
+    return '…'
+  }
+  const price = quoteBySymbol.get(quoteSymbol)
+  return price === undefined ? '—' : formatPriceEur(price)
+}
 
 function pillClass(active: boolean): string {
   return `rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
@@ -47,6 +118,15 @@ function formatQuantity(qty: number): string {
   return qty.toLocaleString('en-IE', { maximumFractionDigits: 6 })
 }
 
+function formatInstrumentMetaLine(holding: {
+  quoteSymbol: string
+  instrumentIsin: string | null
+}): string {
+  return holding.instrumentIsin
+    ? `${holding.quoteSymbol} · ${holding.instrumentIsin}`
+    : holding.quoteSymbol
+}
+
 function formatPriceEur(price: number): string {
   return new Intl.NumberFormat('en-IE', {
     style: 'currency',
@@ -56,7 +136,7 @@ function formatPriceEur(price: number): string {
   }).format(price)
 }
 
-/** Unrealized move vs cost basis, e.g. +3% or -21%. */
+/** Unrealized move vs cost basis, e.g. +3.25% or -21.40%. */
 function formatUnrealizedPercent(
   plCents: number,
   costBasisCents: number,
@@ -64,8 +144,12 @@ function formatUnrealizedPercent(
   if (costBasisCents <= 0) {
     return null
   }
-  const pct = Math.round((plCents / costBasisCents) * 100)
-  return `${pct >= 0 ? '+' : ''}${pct}%`
+  const pct = (plCents / costBasisCents) * 100
+  const formatted = pct.toLocaleString('en-IE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return `${pct >= 0 ? '+' : ''}${formatted}%`
 }
 
 function plToneClass(plCents: number | null): string {
@@ -73,6 +157,42 @@ function plToneClass(plCents: number | null): string {
     return 'text-slate-400'
   }
   return plCents >= 0 ? 'text-emerald-400' : 'text-red-400'
+}
+
+function InstrumentListingFacts({
+  listing,
+  lookupQuery,
+  quoteBySymbol,
+  quotesLoading,
+}: {
+  listing: ResolvedInstrument
+  lookupQuery: string
+  quoteBySymbol: Map<string, number>
+  quotesLoading: boolean
+}) {
+  const isin = resolveListingIsin(listing, lookupQuery)
+  return (
+    <dl className="mt-2 grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 text-sm">
+      {isin ? (
+        <>
+          <dt className="text-slate-500">ISIN</dt>
+          <dd className="text-slate-200">{isin}</dd>
+        </>
+      ) : null}
+      <dt className="text-slate-500">Ticker</dt>
+      <dd className="font-mono text-slate-200">{listing.quoteSymbol}</dd>
+      {listing.exchange ? (
+        <>
+          <dt className="text-slate-500">Exchange</dt>
+          <dd className="text-slate-200">{listing.exchange}</dd>
+        </>
+      ) : null}
+      <dt className="text-slate-500">Last price</dt>
+      <dd className="text-slate-200 tabular-nums">
+        {formatListingLastPrice(listing.quoteSymbol, quoteBySymbol, quotesLoading)}
+      </dd>
+    </dl>
+  )
 }
 
 type OpeningForm = {
@@ -84,12 +204,14 @@ type OpeningForm = {
 }
 
 type PurchaseForm = {
+  purchaseId?: string
   holdingId: string
   accountId: string
   instrumentLabel: string
   quoteSymbol: string
   isin: string | null
   name: string
+  assetKind: InstrumentAssetKind
   purchaseDate: string
   amount: string
   navPerUnit: string
@@ -108,11 +230,13 @@ export function InvestmentPage() {
   const accounts = useMemo(() => listAccounts(db), [db])
   const defaultAccountId = accounts[0]?.id ?? ''
   const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [activeAssetTab, setActiveAssetTab] = useState<InstrumentAssetKind>('etf')
+  const [openingAssetKind, setOpeningAssetKind] = useState<InstrumentAssetKind>('etf')
 
   const {
     holdings,
     priceEurByInstrumentId,
-    totals,
+    totals: _portfolioTotals,
     loading,
     stale,
     fetchedAt,
@@ -122,14 +246,34 @@ export function InvestmentPage() {
     reloadHoldings,
   } = usePortfolioQuotes(accountFilter === 'all' ? undefined : accountFilter)
 
-  const refreshQuotesRef = useRef(refreshQuotes)
-  refreshQuotesRef.current = refreshQuotes
-  useEffect(() => {
-    void refreshQuotesRef.current()
-  }, [])
-
+  void _portfolioTotals
   void dataRevision
   const recentPurchases = listRecentHoldingPurchases(db, 15)
+
+  const tabHoldings = useMemo(
+    () => holdings.filter((h) => h.instrumentAssetKind === activeAssetTab),
+    [holdings, activeAssetTab],
+  )
+
+  const tabTotals = useMemo(
+    () => computePortfolioTotals(tabHoldings, priceEurByInstrumentId),
+    [tabHoldings, priceEurByInstrumentId],
+  )
+
+  const tabPurchases = useMemo(
+    () => recentPurchases.filter((p) => p.instrumentAssetKind === activeAssetTab),
+    [recentPurchases, activeAssetTab],
+  )
+
+  const unrealizedCents =
+    tabTotals.marketValueCents === null
+      ? null
+      : tabTotals.marketValueCents - tabTotals.costBasisCents
+
+  const unrealizedPercentLabel =
+    unrealizedCents !== null
+      ? formatUnrealizedPercent(unrealizedCents, tabTotals.costBasisCents)
+      : null
 
   const [openingOpen, setOpeningOpen] = useState(false)
   const [purchaseOpen, setPurchaseOpen] = useState(false)
@@ -138,31 +282,104 @@ export function InvestmentPage() {
   )
   const [purchaseForm, setPurchaseForm] = useState<PurchaseForm | null>(null)
   const [resolved, setResolved] = useState<ResolvedInstrument | null>(null)
+  const [lookupOptions, setLookupOptions] = useState<ResolvedInstrument[]>([])
   const [lookupLoading, setLookupLoading] = useState(false)
+  const [listingPickerOpen, setListingPickerOpen] = useState(false)
+  const [listingQuoteBySymbol, setListingQuoteBySymbol] = useState<Map<string, number>>(
+    () => new Map(),
+  )
+  const [listingQuotesLoading, setListingQuotesLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletePurchaseTargetId, setDeletePurchaseTargetId] = useState<string | null>(
+    null,
+  )
 
-  const unrealizedCents =
-    totals.marketValueCents === null
-      ? null
-      : totals.marketValueCents - totals.costBasisCents
+  async function loadListingQuotes(
+    listings: ResolvedInstrument[],
+    applyAvgCostFor?: ResolvedInstrument | null,
+  ) {
+    if (listings.length === 0) {
+      setListingQuoteBySymbol(new Map())
+      return
+    }
+    setListingQuotesLoading(true)
+    try {
+      const { quotes } = await fetchQuotesForInstruments(
+        listings.map((listing) => ({
+          quoteSymbol: listing.quoteSymbol,
+          assetKind: listing.assetKind,
+        })),
+      )
+      const next = new Map<string, number>()
+      for (const listing of listings) {
+        const quote = quotes.get(listing.quoteSymbol)
+        if (quote) {
+          next.set(listing.quoteSymbol, quote.priceEur)
+        }
+      }
+      setListingQuoteBySymbol(next)
+      if (applyAvgCostFor) {
+        const price = next.get(applyAvgCostFor.quoteSymbol)
+        if (price !== undefined) {
+          setOpeningForm((prev) => ({
+            ...prev,
+            avgCostPerUnit: unitPriceEurToInputValue(price),
+          }))
+        }
+      }
+    } finally {
+      setListingQuotesLoading(false)
+    }
+  }
 
-  const unrealizedPercentLabel =
-    unrealizedCents !== null
-      ? formatUnrealizedPercent(unrealizedCents, totals.costBasisCents)
-      : null
+  function resetListingPickerState() {
+    setListingPickerOpen(false)
+    setListingQuoteBySymbol(new Map())
+    setListingQuotesLoading(false)
+  }
+
+  function closeOpeningModal() {
+    setOpeningOpen(false)
+    resetListingPickerState()
+  }
+
+  function selectListing(listing: ResolvedInstrument) {
+    setResolved(listing)
+    setListingPickerOpen(false)
+    setFormError(null)
+    const price = listingQuoteBySymbol.get(listing.quoteSymbol)
+    if (price !== undefined) {
+      setOpeningForm((prev) => ({
+        ...prev,
+        avgCostPerUnit: unitPriceEurToInputValue(price),
+      }))
+    } else {
+      void loadListingQuotes(lookupOptions, listing)
+    }
+  }
 
   async function handleLookup(query: string) {
     setFormError(null)
     setResolved(null)
+    setLookupOptions([])
+    resetListingPickerState()
     if (!query.trim()) {
       return
     }
     setLookupLoading(true)
     try {
-      const result = await resolveInstrument(query)
-      setResolved(result)
+      const results = await searchInstrumentListings(query, openingAssetKind)
+      setLookupOptions(results)
+      if (results.length === 1) {
+        const pick = results[0]!
+        setResolved(pick)
+        void loadListingQuotes(results, pick)
+        return
+      }
+      setListingPickerOpen(true)
+      void loadListingQuotes(results)
     } catch (error: unknown) {
       setFormError(error instanceof Error ? error.message : 'Lookup failed.')
     } finally {
@@ -171,8 +388,11 @@ export function InvestmentPage() {
   }
 
   function openOpeningModal() {
+    setOpeningAssetKind(activeAssetTab)
     setOpeningForm(emptyOpeningForm(defaultAccountId))
     setResolved(null)
+    setLookupOptions([])
+    resetListingPickerState()
     setFormError(null)
     setOpeningOpen(true)
   }
@@ -186,12 +406,13 @@ export function InvestmentPage() {
         quoteSymbol: holding.quoteSymbol,
         isin: holding.instrumentIsin,
         name: holding.instrumentName,
+        assetKind: holding.instrumentAssetKind,
         purchaseDate: todayRomeDateInputValue(),
         amount: '',
         navPerUnit: '',
       })
-    } else if (holdings.length === 1) {
-      openPurchaseModal(holdings[0])
+    } else if (tabHoldings.length === 1) {
+      openPurchaseModal(tabHoldings[0])
       return
     } else {
       setFormError(null)
@@ -202,14 +423,38 @@ export function InvestmentPage() {
     setPurchaseOpen(true)
   }
 
+  function openEditPurchaseModal(row: (typeof tabPurchases)[number]) {
+    setPurchaseForm({
+      purchaseId: row.id,
+      holdingId: row.holdingId,
+      accountId: row.accountId,
+      instrumentLabel: row.instrumentName,
+      quoteSymbol: row.quoteSymbol,
+      isin: row.instrumentIsin,
+      name: row.instrumentName,
+      assetKind: row.instrumentAssetKind,
+      purchaseDate: utcIsoToRomeDateInputValue(row.purchaseDate),
+      amount: centsToInputValue(row.amountCents),
+      navPerUnit: unitPriceEurToInputValue(row.priceCentsPerUnit / 100),
+    })
+    setFormError(null)
+    setPurchaseOpen(true)
+  }
+
   function handleSaveOpening() {
     setFormError(null)
     if (!resolved) {
-      setFormError('Look up an ETF by ISIN or ticker first.')
+      setFormError(
+        lookupOptions.length > 1
+          ? openingAssetKind === 'crypto'
+            ? 'Select a cryptocurrency.'
+            : 'Select a listing.'
+          : `Look up ${lookupFieldLabel(openingAssetKind).toLowerCase()} first.`,
+      )
       return
     }
     const quantity = parseQuantity(openingForm.quantity)
-    const priceCentsPerUnit = parseInputToCents(openingForm.avgCostPerUnit)
+    const priceCentsPerUnit = parseInputToUnitPriceCents(openingForm.avgCostPerUnit)
     if (!openingForm.accountId) {
       setFormError('Select an account.')
       return
@@ -231,9 +476,10 @@ export function InvestmentPage() {
       createOpeningHolding(db, {
         accountId: openingForm.accountId,
         instrument: {
-          isin: resolved.isin,
+          isin: resolved.isin ?? parseIsinFromQuery(openingForm.query),
           quoteSymbol: resolved.quoteSymbol,
           name: resolved.name,
+          assetKind: resolved.assetKind,
         },
         openingDate: openingForm.openingDate,
         quantity,
@@ -255,7 +501,7 @@ export function InvestmentPage() {
     }
     setFormError(null)
     const amountCents = parseInputToCents(purchaseForm.amount)
-    const priceCentsPerUnit = parseInputToCents(purchaseForm.navPerUnit)
+    const priceCentsPerUnit = parseInputToUnitPriceCents(purchaseForm.navPerUnit)
     if (amountCents === null || amountCents <= 0) {
       setFormError('Enter a valid amount invested.')
       return
@@ -270,17 +516,26 @@ export function InvestmentPage() {
       return
     }
     try {
-      recordHoldingPurchase(db, {
-        accountId: purchaseForm.accountId,
-        instrument: {
-          isin: purchaseForm.isin,
-          quoteSymbol: purchaseForm.quoteSymbol,
-          name: purchaseForm.name,
-        },
-        purchaseDate: purchaseForm.purchaseDate,
-        amountCents,
-        priceCentsPerUnit,
-      })
+      if (purchaseForm.purchaseId) {
+        updateHoldingPurchase(db, purchaseForm.purchaseId, {
+          purchaseDate: purchaseForm.purchaseDate,
+          amountCents,
+          priceCentsPerUnit,
+        })
+      } else {
+        recordHoldingPurchase(db, {
+          accountId: purchaseForm.accountId,
+          instrument: {
+            isin: purchaseForm.isin,
+            quoteSymbol: purchaseForm.quoteSymbol,
+            name: purchaseForm.name,
+            assetKind: purchaseForm.assetKind,
+          },
+          purchaseDate: purchaseForm.purchaseDate,
+          amountCents,
+          priceCentsPerUnit,
+        })
+      }
       setPurchaseOpen(false)
       setPurchaseForm(null)
       reloadHoldings()
@@ -310,6 +565,22 @@ export function InvestmentPage() {
     }
   }
 
+  function confirmDeletePurchase() {
+    if (!deletePurchaseTargetId) {
+      return
+    }
+    try {
+      deleteHoldingPurchase(db, deletePurchaseTargetId)
+      setDeletePurchaseTargetId(null)
+      reloadHoldings()
+    } catch (error: unknown) {
+      setFormError(
+        error instanceof Error ? error.message : 'Could not delete purchase.',
+      )
+      setDeletePurchaseTargetId(null)
+    }
+  }
+
   return (
     <div className="app-page p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
@@ -336,18 +607,31 @@ export function InvestmentPage() {
             onClick={openOpeningModal}
           >
             <Plus className="size-4" aria-hidden />
-            Add ETF
+            {addPositionButtonLabel(activeAssetTab)}
           </button>
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white"
             onClick={() => openPurchaseModal()}
-            disabled={holdings.length === 0}
+            disabled={tabHoldings.length === 0}
           >
             Record purchase
           </button>
         </div>
       </header>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {ASSET_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={pillClass(activeAssetTab === tab.id)}
+            onClick={() => setActiveAssetTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button
@@ -375,9 +659,9 @@ export function InvestmentPage() {
             Market value
           </p>
           <p className="mt-1 text-xl font-semibold text-white">
-            {totals.marketValueCents === null
+            {tabTotals.marketValueCents === null
               ? '—'
-              : formatCents(totals.marketValueCents)}
+              : formatCents(tabTotals.marketValueCents)}
           </p>
           {stale ? (
             <p className="mt-1 text-xs text-amber-400">Stale or partial quotes</p>
@@ -393,7 +677,7 @@ export function InvestmentPage() {
             Cost basis
           </p>
           <p className="mt-1 text-xl font-semibold text-white">
-            {formatCents(totals.costBasisCents)}
+            {formatCents(tabTotals.costBasisCents)}
           </p>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
@@ -420,28 +704,38 @@ export function InvestmentPage() {
       ) : null}
 
       <div className="app-page-scroll-ceiling">
-        <table className="w-full min-w-240 text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-950 text-xs text-slate-400 uppercase">
+        <table className="investments-table text-sm">
+          <colgroup>
+            <col className="investments-col-instrument" />
+            <col className="investments-col-money" />
+            <col className="investments-col-money" />
+            <col className="investments-col-money" />
+            <col className="investments-col-money" />
+            <col className="investments-col-money" />
+            <col className="investments-col-account" />
+            <col className="investments-col-actions" />
+          </colgroup>
+          <thead className="data-table-head">
             <tr>
-              <th className="px-3 py-2 font-medium">Instrument</th>
-              <th className="px-3 py-2 font-medium">Account</th>
-              <th className="px-3 py-2 text-right font-medium">Quantity</th>
-              <th className="px-3 py-2 text-right font-medium">Avg cost</th>
-              <th className="px-3 py-2 text-right font-medium">Last price</th>
-              <th className="px-3 py-2 text-right font-medium">Market value</th>
-              <th className="px-3 py-2 text-right font-medium">P/L</th>
-              <th className="px-3 py-2 text-right font-medium">Actions</th>
+              <th className="investments-cell-instrument px-3 py-2">Instrument</th>
+              <th className="money-cell px-3 py-2">Quantity</th>
+              <th className="money-cell px-3 py-2">Avg cost</th>
+              <th className="money-cell px-3 py-2">Last price</th>
+              <th className="money-cell px-3 py-2">Market value</th>
+              <th className="money-cell px-3 py-2">P/L</th>
+              <th className="px-3 py-2">Account</th>
+              <th className="investments-cell-actions px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800 text-slate-200">
-            {holdings.length === 0 ? (
+            {tabHoldings.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
-                  No ETF holdings yet. Add an opening position to get started.
+                  {emptyHoldingsMessage(activeAssetTab)}
                 </td>
               </tr>
             ) : (
-              holdings.map((holding) => {
+              tabHoldings.map((holding) => {
                 const avgCostEur = holding.totalCostCents / holding.quantity / 100
                 const lastPrice = priceEurByInstrumentId.get(holding.instrumentId)
                 const mvCents =
@@ -456,35 +750,33 @@ export function InvestmentPage() {
                     : formatUnrealizedPercent(plCents, holding.totalCostCents)
                 return (
                   <tr key={holding.id} className="hover:bg-slate-900/50">
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-white">
-                        {holding.instrumentName}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {holding.quoteSymbol}
-                        {holding.instrumentIsin ? ` · ${holding.instrumentIsin}` : ''}
-                      </div>
+                    <td className="investments-cell-instrument px-3 py-2">
+                      <OverflowTooltip
+                        text={holding.instrumentName}
+                        className="font-medium text-white"
+                      >
+                        <div className="truncate text-xs text-slate-500">
+                          {formatInstrumentMetaLine(holding)}
+                        </div>
+                      </OverflowTooltip>
                     </td>
-                    <td className="px-3 py-2">{holding.accountName}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
+                    <td className="money-cell px-3 py-2">
                       {formatQuantity(holding.quantity)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatPriceEur(avgCostEur)}
+                    <td className="money-cell px-3 py-2">
+                      {formatUnitPriceEur(avgCostEur)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
+                    <td className="money-cell px-3 py-2">
                       {lastPrice === undefined ? '—' : formatPriceEur(lastPrice)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
+                    <td className="money-cell px-3 py-2">
                       {mvCents === null ? '—' : formatCents(mvCents)}
                     </td>
-                    <td
-                      className={`px-3 py-2 text-right tabular-nums ${plToneClass(plCents)}`}
-                    >
+                    <td className={`money-cell px-3 py-2 ${plToneClass(plCents)}`}>
                       {plCents === null ? (
                         '—'
                       ) : (
-                        <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex flex-col items-center gap-0.5">
                           <span>{formatCents(plCents)}</span>
                           {plPercentLabel ? (
                             <span className="text-xs font-medium">
@@ -494,8 +786,9 @@ export function InvestmentPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="inline-flex gap-1">
+                    <td className="px-3 py-2">{holding.accountName}</td>
+                    <td className="investments-cell-actions px-3 py-2">
+                      <div className="flex justify-center gap-1">
                         <button
                           type="button"
                           className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
@@ -524,65 +817,108 @@ export function InvestmentPage() {
 
       <section className="mt-10">
         <h3 className="mb-3 text-lg font-semibold text-white">Recent purchases</h3>
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
-          <table className="w-full min-w-160 text-left text-sm">
-            <thead className="bg-slate-900/80 text-xs text-slate-400 uppercase">
-              <tr>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Instrument</th>
-                <th className="px-3 py-2 font-medium">Account</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
-                <th className="px-3 py-2 text-right font-medium">NAV</th>
-                <th className="px-3 py-2 text-right font-medium">Units</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-200">
-              {recentPurchases.length === 0 ? (
+        <div className="recent-purchases-shell">
+          <div className="recent-purchases-scroll">
+            <table className="recent-purchases-table text-sm">
+              <colgroup>
+                <col className="recent-purchases-col-date" />
+                <col />
+                <col className="recent-purchases-col-account" />
+                <col className="recent-purchases-col-money" />
+                <col className="recent-purchases-col-money" />
+                <col className="recent-purchases-col-money" />
+                <col className="recent-purchases-col-actions" />
+              </colgroup>
+              <thead className="data-table-head">
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
-                    No purchases recorded yet.
-                  </td>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="recent-purchases-cell-instrument px-3 py-2">
+                    Instrument
+                  </th>
+                  <th className="px-3 py-2">Account</th>
+                  <th className="money-cell px-3 py-2">Amount</th>
+                  <th className="money-cell px-3 py-2">NAV</th>
+                  <th className="money-cell px-3 py-2">Units</th>
+                  <th className="px-3 py-2">Actions</th>
                 </tr>
-              ) : (
-                recentPurchases.map((row) => (
-                  <tr key={row.id}>
-                    <td className="px-3 py-2">
-                      {formatItalianCalendarDateInRome(row.purchaseDate)}
-                    </td>
-                    <td className="px-3 py-2">{row.instrumentName}</td>
-                    <td className="px-3 py-2">{row.accountName}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatCents(row.amountCents)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatPriceEur(row.priceCentsPerUnit / 100)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatQuantity(row.quantity)}
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-200">
+                {tabPurchases.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                      No purchases recorded yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  tabPurchases.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-3 py-2">
+                        {formatItalianCalendarDateInRome(row.purchaseDate)}
+                      </td>
+                      <td className="recent-purchases-cell-instrument px-3 py-2">
+                        <OverflowTooltip text={row.instrumentName} />
+                      </td>
+                      <td className="px-3 py-2">{row.accountName}</td>
+                      <td className="money-cell px-3 py-2">
+                        {formatCents(row.amountCents)}
+                      </td>
+                      <td className="money-cell px-3 py-2">
+                        {formatUnitPriceEur(row.priceCentsPerUnit / 100)}
+                      </td>
+                      <td className="money-cell px-3 py-2">
+                        {formatQuantity(row.quantity)}
+                      </td>
+                      <td className="recent-purchases-cell-actions px-3 py-2">
+                        <div className="flex justify-center gap-1">
+                          <button
+                            type="button"
+                            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+                            title="Edit purchase"
+                            onClick={() => openEditPurchaseModal(row)}
+                          >
+                            <Pencil className="size-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-red-400"
+                            title="Delete purchase"
+                            onClick={() => setDeletePurchaseTargetId(row.id)}
+                          >
+                            <Trash2 className="size-4" aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
       <Modal
         title="Add opening position"
         open={openingOpen}
-        onClose={() => setOpeningOpen(false)}
+        onClose={closeOpeningModal}
       >
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-400">ISIN or ticker</span>
+            <span className="text-slate-400">{lookupFieldLabel(openingAssetKind)}</span>
             <div className="flex gap-2">
               <input
-                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+                className="form-field min-w-0 flex-1"
                 value={openingForm.query}
-                onChange={(event) =>
-                  setOpeningForm((prev) => ({ ...prev, query: event.target.value }))
-                }
+                onChange={(event) => {
+                  setOpeningForm((prev) => ({
+                    ...prev,
+                    query: event.target.value,
+                    avgCostPerUnit: '',
+                  }))
+                  setResolved(null)
+                  setLookupOptions([])
+                  resetListingPickerState()
+                }}
               />
               <button
                 type="button"
@@ -594,10 +930,41 @@ export function InvestmentPage() {
               </button>
             </div>
           </label>
+          {lookupOptions.length > 1 && !resolved ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-slate-400">
+                {lookupOptions.length} listings found. Choose one to continue.
+              </p>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                onClick={() => setListingPickerOpen(true)}
+              >
+                Choose listing
+              </button>
+            </div>
+          ) : null}
           {resolved ? (
-            <p className="text-sm text-emerald-400">
-              {resolved.name} ({resolved.quoteSymbol})
-            </p>
+            <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-medium text-white">{resolved.name}</p>
+                {lookupOptions.length > 1 ? (
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                    onClick={() => setListingPickerOpen(true)}
+                  >
+                    Change
+                  </button>
+                ) : null}
+              </div>
+              <InstrumentListingFacts
+                listing={resolved}
+                lookupQuery={openingForm.query}
+                quoteBySymbol={listingQuoteBySymbol}
+                quotesLoading={listingQuotesLoading}
+              />
+            </div>
           ) : null}
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Account</span>
@@ -624,7 +991,7 @@ export function InvestmentPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Quantity (units)</span>
             <input
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+              className="form-field w-full"
               inputMode="decimal"
               value={openingForm.quantity}
               onChange={(event) =>
@@ -635,7 +1002,7 @@ export function InvestmentPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-400">Average cost per unit (EUR)</span>
             <input
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+              className="form-field w-full"
               inputMode="decimal"
               value={openingForm.avgCostPerUnit}
               onChange={(event) =>
@@ -648,7 +1015,7 @@ export function InvestmentPage() {
           </label>
           {(() => {
             const quantity = parseQuantity(openingForm.quantity)
-            const priceCents = parseInputToCents(openingForm.avgCostPerUnit)
+            const priceCents = parseInputToUnitPriceCents(openingForm.avgCostPerUnit)
             if (quantity !== null && priceCents !== null && priceCents > 0) {
               const basis = Math.round(quantity * priceCents)
               return (
@@ -659,9 +1026,9 @@ export function InvestmentPage() {
             }
             return null
           })()}
-          {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
+          <FormError message={formError} />
           <ModalActions
-            onCancel={() => setOpeningOpen(false)}
+            onCancel={closeOpeningModal}
             submitType="button"
             onSubmit={handleSaveOpening}
           />
@@ -669,11 +1036,59 @@ export function InvestmentPage() {
       </Modal>
 
       <Modal
-        title="Record purchase"
+        title={
+          openingAssetKind === 'crypto' ? 'Choose cryptocurrency' : 'Choose listing'
+        }
+        open={listingPickerOpen && openingOpen}
+        onClose={() => setListingPickerOpen(false)}
+        layerClassName="z-[60]"
+        panelClassName="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-xl"
+      >
+        <div className="shrink-0 space-y-3">
+          <p className="text-sm text-slate-400">
+            {openingAssetKind === 'crypto'
+              ? 'Multiple assets match your search. Pick the one you hold.'
+              : 'Multiple listings match your search. Pick the exchange and ticker you track for quotes.'}
+          </p>
+          {listingQuotesLoading ? (
+            <p className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Loading last prices…
+            </p>
+          ) : null}
+        </div>
+        <div className={`min-h-0 flex-1 overflow-y-auto py-3 ${APP_SCROLLBAR_CLASS}`}>
+          <div className="flex flex-col gap-3 pr-1">
+            {lookupOptions.map((listing) => (
+              <button
+                key={listing.quoteSymbol}
+                type="button"
+                className="rounded-lg border border-slate-700 bg-slate-950/60 p-4 text-left transition-colors hover:border-slate-500 hover:bg-slate-800/80"
+                onClick={() => selectListing(listing)}
+              >
+                <p className="text-sm font-medium text-white">{listing.name}</p>
+                <InstrumentListingFacts
+                  listing={listing}
+                  lookupQuery={openingForm.query}
+                  quoteBySymbol={listingQuoteBySymbol}
+                  quotesLoading={listingQuotesLoading}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="shrink-0 pt-4">
+          <ModalCancelOnly onCancel={() => setListingPickerOpen(false)} />
+        </div>
+      </Modal>
+
+      <Modal
+        title={purchaseForm?.purchaseId ? 'Edit purchase' : 'Record purchase'}
         open={purchaseOpen}
         onClose={() => {
           setPurchaseOpen(false)
           setPurchaseForm(null)
+          setFormError(null)
         }}
       >
         {purchaseForm ? (
@@ -696,7 +1111,7 @@ export function InvestmentPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-400">Amount invested (EUR)</span>
               <input
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+                className="form-field w-full"
                 inputMode="decimal"
                 value={purchaseForm.amount}
                 onChange={(event) =>
@@ -709,7 +1124,7 @@ export function InvestmentPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-400">NAV per unit (EUR)</span>
               <input
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+                className="form-field w-full"
                 inputMode="decimal"
                 value={purchaseForm.navPerUnit}
                 onChange={(event) =>
@@ -721,7 +1136,7 @@ export function InvestmentPage() {
             </label>
             {(() => {
               const amountCents = parseInputToCents(purchaseForm.amount)
-              const navCents = parseInputToCents(purchaseForm.navPerUnit)
+              const navCents = parseInputToUnitPriceCents(purchaseForm.navPerUnit)
               if (amountCents && navCents && navCents > 0) {
                 return (
                   <p className="text-sm text-slate-400">
@@ -731,12 +1146,14 @@ export function InvestmentPage() {
               }
               return null
             })()}
-            {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
+            <FormError message={formError} />
             <ModalActions
               onCancel={() => {
                 setPurchaseOpen(false)
                 setPurchaseForm(null)
+                setFormError(null)
               }}
+              submitLabel={purchaseForm.purchaseId ? 'Save' : 'Record'}
               submitType="button"
               onSubmit={handleSavePurchase}
             />
@@ -744,7 +1161,7 @@ export function InvestmentPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">Choose a holding:</p>
-            {holdings.map((holding) => (
+            {tabHoldings.map((holding) => (
               <button
                 key={holding.id}
                 type="button"
@@ -762,6 +1179,26 @@ export function InvestmentPage() {
             />
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="Delete purchase"
+        open={deletePurchaseTargetId !== null}
+        onClose={() => setDeletePurchaseTargetId(null)}
+      >
+        <p className="text-sm text-slate-300">
+          Remove this purchase from the portfolio? The linked investment transaction
+          will be deleted too, and the position quantity and cost basis will be updated.
+        </p>
+        <div className="mt-6">
+          <ModalActions
+            onCancel={() => setDeletePurchaseTargetId(null)}
+            submitLabel="Delete"
+            submitType="button"
+            onSubmit={confirmDeletePurchase}
+            submitClassName="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500"
+          />
+        </div>
       </Modal>
 
       <Modal

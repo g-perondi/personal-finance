@@ -1,7 +1,7 @@
 import { TZDateMini } from '@date-fns/tz'
 import { format } from 'date-fns'
 import type { DashboardPeriod } from './dashboard-period'
-import { addMonthsToYearMonth, DISPLAY_TIME_ZONE } from './datetime'
+import { addMonthsToYearMonth, getDisplayTimeZone } from './datetime'
 
 export type MonthTotals = {
   incomeCents: number
@@ -48,6 +48,6 @@ export function priorPeriod(period: DashboardPeriod): DashboardPeriod | null {
     return { scope: 'month', yearMonth: addMonthsToYearMonth(period.yearMonth, -1) }
   }
   const [y, m, d] = period.calendarDate.split('-').map(Number)
-  const prev = new TZDateMini(y!, m! - 1, d! - 1, DISPLAY_TIME_ZONE)
+  const prev = new TZDateMini(y!, m! - 1, d! - 1, getDisplayTimeZone())
   return { scope: 'day', calendarDate: format(prev, 'yyyy-MM-dd') }
 }

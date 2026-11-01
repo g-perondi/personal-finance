@@ -13,8 +13,9 @@ import {
 } from '../components/transactions/TransactionKindDisplay'
 import { FormSelect } from '../components/ui/FormSelect'
 import { Modal, ModalActions } from '../components/ui/Modal'
+import { FormError } from '../components/ui/FormError'
 import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
-import { getEarliestAccountYearInRome, listAccounts } from '../db/repositories/account'
+import { listAccounts } from '../db/repositories/account'
 import { listCategories } from '../db/repositories/category'
 import type { TransactionListItem, TransactionRecord } from '../db/repositories/model'
 import {
@@ -30,15 +31,9 @@ import {
   updateTransfer,
 } from '../db/repositories/transfer'
 import type { RecurrenceKind } from '../db/types'
+import { useDashboardPeriod } from '../hooks/useDashboardPeriod'
 import { useDatabase } from '../hooks/useDatabase'
-import {
-  clampPeriodForDashboard,
-  coercePeriodForScope,
-  defaultDashboardPeriod,
-  periodBounds,
-  type DashboardPeriod,
-  type DashboardScope,
-} from '../lib/dashboard-period'
+import { periodBounds } from '../lib/dashboard-period'
 import {
   formatCalendarDateInRome,
   todayRomeDateInputValue,
@@ -51,6 +46,7 @@ import {
   originalDeltasForEditingTransfer,
   projectBalanceAfterEntry,
 } from '../lib/balance-projection'
+import { focusFormField, formFieldClass } from '../lib/form-validation'
 
 type FormState = {
   kind: EntryKind
@@ -91,6 +87,22 @@ function entryKindNeedsRecurrence(kind: EntryKind): boolean {
   return kind === 'income' || kind === 'expense' || kind === 'investment'
 }
 
+function normalizeCreateEntryKind(kind: EntryKind): EntryKind {
+  if (kind === 'investment') {
+    return 'expense'
+  }
+  return kind
+}
+
+const TX_FIELD = {
+  amount: 'tx-amount',
+  date: 'tx-date',
+  description: 'tx-description',
+  account: 'tx-account',
+  fromAccount: 'tx-from-account',
+  toAccount: 'tx-to-account',
+} as const
+
 const emptyForm = (): FormState => ({
   kind: 'expense',
   accountId: '',
@@ -108,9 +120,9 @@ function addEntryModalTitle(
   editingTransferId: string | null,
 ): string {
   if (editingTxId || editingTransferId) {
-    return 'Edit entry'
+    return 'Edit transaction'
   }
-  return 'Add entry'
+  return 'Add transaction'
 }
 
 function BalancePreviewBlock({
@@ -146,8 +158,7 @@ function BalancePreviewBlock({
 
 export function TransactionPage() {
   const db = useDatabase()
-  const [scope, setScope] = useState<DashboardScope>('global')
-  const [period, setPeriod] = useState<DashboardPeriod>(() => defaultDashboardPeriod())
+  const { scope, period, earliestYear, setScope, setPeriod } = useDashboardPeriod()
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -161,11 +172,11 @@ export function TransactionPage() {
   )
   const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [invalidFieldId, setInvalidFieldId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<TransactionListItem | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const lastCreateDefaultsRef = useRef<LastCreateDefaults | null>(null)
 
-  const earliestYear = useMemo(() => getEarliestAccountYearInRome(db), [db])
   const bounds = useMemo(
     () => periodBounds(period, earliestYear),
     [period, earliestYear],
@@ -191,13 +202,17 @@ export function TransactionPage() {
 
   const bump = useCallback(() => setRefreshKey((k) => k + 1), [])
 
-  function handleScopeChange(next: DashboardScope) {
-    setScope(next)
-    setPeriod((current) => coercePeriodForScope(next, current, earliestYear))
+  function clearFieldValidation(fieldId: string) {
+    if (invalidFieldId === fieldId) {
+      setInvalidFieldId(null)
+      setError(null)
+    }
   }
 
-  function handlePeriodChange(next: DashboardPeriod) {
-    setPeriod(clampPeriodForDashboard(next, earliestYear))
+  function failFieldValidation(message: string, fieldId: string) {
+    setError(message)
+    setInvalidFieldId(fieldId)
+    focusFormField(fieldId)
   }
 
   function openCreate() {
@@ -213,7 +228,7 @@ export function TransactionPage() {
     if (last) {
       setForm({
         ...emptyForm(),
-        kind: last.kind,
+        kind: normalizeCreateEntryKind(last.kind),
         accountId: pickExistingAccountId(last.accountId, accountIds, firstAccount),
         fromAccountId: pickExistingAccountId(
           last.fromAccountId,
@@ -237,6 +252,7 @@ export function TransactionPage() {
       })
     }
     setError(null)
+    setInvalidFieldId(null)
     setModalOpen(true)
   }
 
@@ -266,6 +282,7 @@ export function TransactionPage() {
       recurrenceKind: tx.recurrenceKind === 'recurring' ? 'recurring' : 'variable',
     })
     setError(null)
+    setInvalidFieldId(null)
     setModalOpen(true)
   }
 
@@ -295,6 +312,7 @@ export function TransactionPage() {
       recurrenceKind: '',
     })
     setError(null)
+    setInvalidFieldId(null)
     setModalOpen(true)
   }
 
@@ -343,19 +361,28 @@ export function TransactionPage() {
     event.preventDefault()
     const amountCents = parseInputToCents(form.amount)
     if (amountCents === null || amountCents <= 0) {
-      setError('Enter a valid amount.')
+      failFieldValidation('Enter a valid amount.', TX_FIELD.amount)
       return
     }
     if (!form.date.trim()) {
-      setError('Enter a valid date.')
+      failFieldValidation('Enter a valid date.', TX_FIELD.date)
+      return
+    }
+    const description = form.description.trim()
+    if (!description) {
+      failFieldValidation('Description is required.', TX_FIELD.description)
       return
     }
 
     try {
       const creating = !editingTxId && !editingTransferId
       if (form.kind === 'transfer') {
-        if (!form.fromAccountId || !form.toAccountId) {
-          setError('Select both accounts.')
+        if (!form.fromAccountId) {
+          failFieldValidation('Select both accounts.', TX_FIELD.fromAccount)
+          return
+        }
+        if (!form.toAccountId) {
+          failFieldValidation('Select both accounts.', TX_FIELD.toAccount)
           return
         }
         const payload = {
@@ -363,7 +390,7 @@ export function TransactionPage() {
           toAccountId: form.toAccountId,
           amountCents,
           transferDate: form.date,
-          note: form.description,
+          note: description,
         }
         if (editingTransferId) {
           updateTransfer(db, editingTransferId, payload)
@@ -372,10 +399,12 @@ export function TransactionPage() {
         }
       } else {
         if (!form.accountId) {
-          setError('Select an account.')
+          failFieldValidation('Select an account.', TX_FIELD.account)
           return
         }
-        const recurrenceKind = entryKindNeedsRecurrence(form.kind)
+        const recurrenceKind: RecurrenceKind | null = entryKindNeedsRecurrence(
+          form.kind,
+        )
           ? form.recurrenceKind === 'recurring'
             ? 'recurring'
             : 'variable'
@@ -385,7 +414,7 @@ export function TransactionPage() {
           kind: form.kind,
           amountCents,
           transactionDate: form.date,
-          description: form.description,
+          description,
           categoryId: form.categoryId || null,
           recurrenceKind,
         }
@@ -402,7 +431,7 @@ export function TransactionPage() {
           fromAccountId: form.fromAccountId,
           toAccountId: form.toAccountId,
           amount: form.amount,
-          description: form.description,
+          description,
           categoryId: form.categoryId,
           recurrenceKind: entryKindNeedsRecurrence(form.kind)
             ? form.recurrenceKind === 'recurring'
@@ -411,6 +440,8 @@ export function TransactionPage() {
             : '',
         }
       }
+      setInvalidFieldId(null)
+      setError(null)
       setModalOpen(false)
       bump()
     } catch (err: unknown) {
@@ -434,6 +465,26 @@ export function TransactionPage() {
       ...accounts.map((account) => ({ value: account.id, label: account.name })),
     ],
     [accounts],
+  )
+
+  const transferFromAccountOptions = useMemo(
+    () => [
+      { value: '', label: 'Select account' },
+      ...accounts
+        .filter((account) => account.id !== form.toAccountId)
+        .map((account) => ({ value: account.id, label: account.name })),
+    ],
+    [accounts, form.toAccountId],
+  )
+
+  const transferToAccountOptions = useMemo(
+    () => [
+      { value: '', label: 'Select account' },
+      ...accounts
+        .filter((account) => account.id !== form.fromAccountId)
+        .map((account) => ({ value: account.id, label: account.name })),
+    ],
+    [accounts, form.fromAccountId],
   )
 
   const categorySelectOptions = useMemo(
@@ -568,12 +619,12 @@ export function TransactionPage() {
               scope={scope}
               period={period}
               earliestYear={earliestYear}
-              onPeriodChange={handlePeriodChange}
+              onPeriodChange={setPeriod}
             />
           </div>
 
           <div className="flex justify-center md:justify-self-end">
-            <DashboardScopeBar scope={scope} onScopeChange={handleScopeChange} />
+            <DashboardScopeBar scope={scope} onScopeChange={setScope} />
           </div>
         </div>
       </header>
@@ -634,7 +685,7 @@ export function TransactionPage() {
                 <col />
                 <col className="transactions-col-actions" />
               </colgroup>
-              <thead className="bg-slate-900/80 text-slate-400">
+              <thead className="data-table-head">
                 <tr>
                   <th scope="col" className="transactions-cell-icon" aria-label="Type">
                     <span className="sr-only">Type</span>
@@ -672,7 +723,11 @@ export function TransactionPage() {
                       {tx.description ?? '—'}
                     </td>
                     <td>{formatCalendarDateInRome(tx.transactionDate)}</td>
-                    <td className="max-w-0 truncate">{tx.accountName}</td>
+                    <td className="max-w-0 truncate">
+                      {tx.kind === 'transfer' && tx.transferCounterpartyName
+                        ? tx.transferCounterpartyName
+                        : tx.accountName}
+                    </td>
                     <td className="max-w-0 truncate text-slate-400">
                       {tx.categoryName ?? '—'}
                     </td>
@@ -709,15 +764,21 @@ export function TransactionPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
       >
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <form className="flex flex-col gap-4" noValidate onSubmit={handleSubmit}>
           <div className="flex flex-col gap-2">
             <span className="text-sm text-slate-300">Type</span>
-            <EntryKindPicker
-              value={form.kind}
-              onChange={handleEntryKindChange}
-              disabled={isEditing}
-              transferDisabled={transferKindDisabled}
-            />
+            {isEditing && form.kind === 'investment' ? (
+              <p className="rounded-xl bg-slate-950/80 px-3 py-2 text-center text-sm font-medium text-slate-200 ring-1 ring-slate-700/60">
+                Investment
+              </p>
+            ) : (
+              <EntryKindPicker
+                value={form.kind}
+                onChange={handleEntryKindChange}
+                disabled={isEditing}
+                transferDisabled={transferKindDisabled}
+              />
+            )}
           </div>
 
           {form.kind === 'transfer' ? (
@@ -725,18 +786,44 @@ export function TransactionPage() {
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-300">From account</span>
                 <FormSelect
+                  id={TX_FIELD.fromAccount}
+                  invalid={invalidFieldId === TX_FIELD.fromAccount}
                   value={form.fromAccountId}
-                  onChange={(fromAccountId) => setForm({ ...form, fromAccountId })}
-                  options={accountSelectOptions}
+                  onChange={(fromAccountId) => {
+                    clearFieldValidation(TX_FIELD.fromAccount)
+                    setForm((prev) => {
+                      let toAccountId = prev.toAccountId
+                      if (fromAccountId && fromAccountId === toAccountId) {
+                        toAccountId =
+                          accounts.find((account) => account.id !== fromAccountId)
+                            ?.id ?? ''
+                      }
+                      return { ...prev, fromAccountId, toAccountId }
+                    })
+                  }}
+                  options={transferFromAccountOptions}
                   placeholder="Select account"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-slate-300">To account</span>
                 <FormSelect
+                  id={TX_FIELD.toAccount}
+                  invalid={invalidFieldId === TX_FIELD.toAccount}
                   value={form.toAccountId}
-                  onChange={(toAccountId) => setForm({ ...form, toAccountId })}
-                  options={accountSelectOptions}
+                  onChange={(toAccountId) => {
+                    clearFieldValidation(TX_FIELD.toAccount)
+                    setForm((prev) => {
+                      let fromAccountId = prev.fromAccountId
+                      if (toAccountId && toAccountId === fromAccountId) {
+                        fromAccountId =
+                          accounts.find((account) => account.id !== toAccountId)?.id ??
+                          ''
+                      }
+                      return { ...prev, fromAccountId, toAccountId }
+                    })
+                  }}
+                  options={transferToAccountOptions}
                   placeholder="Select account"
                 />
               </label>
@@ -745,8 +832,13 @@ export function TransactionPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-300">Account</span>
               <FormSelect
+                id={TX_FIELD.account}
+                invalid={invalidFieldId === TX_FIELD.account}
                 value={form.accountId}
-                onChange={(accountId) => setForm({ ...form, accountId })}
+                onChange={(accountId) => {
+                  clearFieldValidation(TX_FIELD.account)
+                  setForm({ ...form, accountId })
+                }}
                 options={accountSelectOptions}
                 placeholder="Select account"
               />
@@ -756,30 +848,44 @@ export function TransactionPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Amount (EUR)</span>
             <input
-              required
+              id={TX_FIELD.amount}
               value={form.amount}
-              onChange={(event) => setForm({ ...form, amount: event.target.value })}
-              className="form-field"
+              onChange={(event) => {
+                clearFieldValidation(TX_FIELD.amount)
+                setForm({ ...form, amount: event.target.value })
+              }}
+              className={formFieldClass('form-field', TX_FIELD.amount, invalidFieldId)}
             />
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Description</span>
             <input
+              id={TX_FIELD.description}
               type="text"
               value={form.description}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearFieldValidation(TX_FIELD.description)
                 setForm({ ...form, description: event.target.value })
-              }
-              className="form-field"
+              }}
+              className={formFieldClass(
+                'form-field',
+                TX_FIELD.description,
+                invalidFieldId,
+              )}
             />
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Date</span>
             <RomeCalendarDateInput
+              id={TX_FIELD.date}
+              invalid={invalidFieldId === TX_FIELD.date}
               value={form.date}
-              onChange={(date) => setForm({ ...form, date })}
+              onChange={(date) => {
+                clearFieldValidation(TX_FIELD.date)
+                setForm({ ...form, date })
+              }}
             />
           </label>
 
@@ -855,7 +961,7 @@ export function TransactionPage() {
             />
           ) : null}
 
-          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          <FormError message={error} />
           <ModalActions onCancel={() => setModalOpen(false)} />
         </form>
       </Modal>
@@ -898,24 +1004,20 @@ export function TransactionPage() {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">Account</dt>
-                <dd className="max-w-[14rem] truncate text-right text-slate-200">
+                <dd className="max-w-56 truncate text-right text-slate-200">
                   {deleteTarget.accountName}
                 </dd>
               </div>
               {deleteTarget.description ? (
                 <div className="flex justify-between gap-4">
                   <dt className="shrink-0 text-slate-500">Description</dt>
-                  <dd className="max-w-[14rem] truncate text-right text-slate-200">
+                  <dd className="max-w-56 truncate text-right text-slate-200">
                     {deleteTarget.description}
                   </dd>
                 </div>
               ) : null}
             </dl>
-            {deleteError ? (
-              <p className="mt-3 text-sm text-red-400" role="alert">
-                {deleteError}
-              </p>
-            ) : null}
+            <FormError message={deleteError} className="mt-3" />
             <div className="mt-6">
               <ModalActions
                 onCancel={closeDeleteModal}

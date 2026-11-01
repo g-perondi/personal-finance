@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { APP_SCROLLBAR_CLASS } from '../../lib/scroll-ui'
 
 type ModalProps = {
   title: string
@@ -88,13 +89,16 @@ export function Modal({
       <div
         className={
           panelClassName ??
-          'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-xl'
+          [
+            'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-xl',
+            APP_SCROLLBAR_CLASS,
+          ].join(' ')
         }
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <h3 id="modal-title" className="text-lg font-semibold text-white">
             {title}
           </h3>

@@ -90,11 +90,11 @@ export type TransactionAmountTone = 'inflow' | 'outflow' | 'transfer'
 
 export function transactionAmountTone(
   kind: TransactionKind,
-  _transferLeg: TransferLeg | null,
+  transferLeg: TransferLeg | null,
   rebalancingDirection: RebalancingDirection | null = null,
 ): TransactionAmountTone {
   if (kind === 'transfer') {
-    return 'transfer'
+    return transferLeg === 'in' ? 'inflow' : 'outflow'
   }
   if (kind === 'income') {
     return 'inflow'
@@ -114,8 +114,12 @@ export function transactionAmountClassName(tone: TransactionAmountTone): string 
 
 export function transactionAmountPrefix(
   kind: TransactionKind,
+  transferLeg: TransferLeg | null = null,
   rebalancingDirection: RebalancingDirection | null = null,
 ): string {
+  if (kind === 'transfer') {
+    return transferLeg === 'in' ? '+' : '−'
+  }
   if (kind === 'income') {
     return '+'
   }
@@ -144,7 +148,7 @@ export function TransactionAmountDisplay({
   className = '',
 }: TransactionAmountDisplayProps) {
   const tone = transactionAmountTone(kind, transferLeg, rebalancingDirection)
-  const prefix = transactionAmountPrefix(kind, rebalancingDirection)
+  const prefix = transactionAmountPrefix(kind, transferLeg, rebalancingDirection)
   return (
     <span
       className={`font-medium tabular-nums ${transactionAmountClassName(tone)} ${className}`.trim()}

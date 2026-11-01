@@ -1,6 +1,8 @@
 export type EntryKind = 'income' | 'expense' | 'investment' | 'transfer'
 
-const KINDS: EntryKind[] = ['expense', 'income', 'investment', 'transfer']
+const DEFAULT_KINDS: EntryKind[] = ['expense', 'income', 'transfer']
+
+const ALL_KINDS: EntryKind[] = ['expense', 'income', 'investment', 'transfer']
 
 const LABELS: Record<EntryKind, string> = {
   expense: 'Expense',
@@ -14,6 +16,8 @@ type EntryKindPickerProps = {
   onChange: (kind: EntryKind) => void
   disabled?: boolean
   transferDisabled?: boolean
+  /** When true, includes Investment (ledger-only; not used for manual entry). */
+  includeInvestment?: boolean
 }
 
 export function EntryKindPicker({
@@ -21,7 +25,10 @@ export function EntryKindPicker({
   onChange,
   disabled = false,
   transferDisabled = false,
+  includeInvestment = false,
 }: EntryKindPickerProps) {
+  const kinds = includeInvestment ? ALL_KINDS : DEFAULT_KINDS
+
   return (
     <div
       className={`flex w-full flex-wrap justify-center gap-0.5 rounded-xl bg-slate-950/80 p-1 ring-1 ring-slate-700/60 ${
@@ -30,7 +37,7 @@ export function EntryKindPicker({
       role="group"
       aria-label="Transaction type"
     >
-      {KINDS.map((kind) => {
+      {kinds.map((kind) => {
         const optionDisabled = disabled || (kind === 'transfer' && transferDisabled)
         return (
           <button

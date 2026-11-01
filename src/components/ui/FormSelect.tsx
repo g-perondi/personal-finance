@@ -5,6 +5,7 @@ import {
   FORM_PICKER_OPTION_SELECTED,
   FORM_PICKER_PANEL_CLASS,
 } from './formPickerUi'
+import { APP_SCROLLBAR_CLASS } from '../../lib/scroll-ui'
 
 const PICKER_LAYER_Z = 100
 const VIEWPORT_MARGIN = 8
@@ -23,6 +24,7 @@ type FormSelectProps = {
   placeholder?: string
   id?: string
   className?: string
+  invalid?: boolean
   'aria-label'?: string
 }
 
@@ -54,6 +56,7 @@ export function FormSelect({
   placeholder = 'Select…',
   id: idProp,
   className = '',
+  invalid = false,
   'aria-label': ariaLabel,
 }: FormSelectProps) {
   const generatedId = useId()
@@ -120,7 +123,7 @@ export function FormSelect({
               width: position.width,
               zIndex: PICKER_LAYER_Z,
             }}
-            className={`max-h-60 overflow-y-auto ${FORM_PICKER_PANEL_CLASS}`}
+            className={`max-h-60 overflow-y-auto ${APP_SCROLLBAR_CLASS} ${FORM_PICKER_PANEL_CLASS}`}
           >
             {options.map((option) => {
               const isSelected = option.value === value
@@ -159,7 +162,7 @@ export function FormSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        className="form-select text-left disabled:opacity-50"
+        className={`form-select text-left disabled:opacity-50 ${invalid ? 'form-field--invalid' : ''}`.trim()}
         onClick={() => setOpen((current) => !current)}
       >
         {selected?.label ?? placeholder}

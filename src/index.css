@@ -40,6 +40,45 @@ select,
   cursor: pointer;
 }
 
+/** Sidebar nav and backup controls: no text selection or link drag ghosts. */
+.app-sidebar,
+.app-sidebar * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app-sidebar :is(a, button, svg) {
+  -webkit-user-drag: none;
+}
+
+/** Table cells: selectable for copy and in-page search (body defaults to user-select: none). */
+.data-table :is(th, td),
+.accounts-table :is(th, td),
+.transactions-table :is(th, td),
+.documents-table :is(th, td),
+.ledger-table :is(th, td),
+.investments-table :is(th, td),
+.recent-purchases-table :is(th, td),
+.data-table-row {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.data-table :is(th, td) :is(button, a, svg),
+.accounts-table :is(th, td) :is(button, a, svg),
+.transactions-table :is(th, td) :is(button, a, svg),
+.documents-table :is(th, td) :is(button, a, svg),
+.documents-table :is(th, td) :is(input[type='checkbox']),
+.ledger-table :is(th, td) :is(button, a, svg),
+.investments-table :is(th, td) :is(button, a, svg),
+.recent-purchases-table :is(th, td) :is(button, a, svg),
+.data-table-row :is(button, a, svg) {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
 /** Form controls — shared border, radius, and focus (Europe/Rome date uses `.form-field`). */
 .form-field {
   border-radius: 0.75rem;
@@ -60,6 +99,17 @@ select,
 
 .form-field:disabled {
   opacity: 0.5;
+}
+
+.form-field--invalid,
+.form-select.form-field--invalid {
+  border-color: rgb(248 113 113);
+}
+
+.form-field--invalid:focus,
+.form-select.form-field--invalid:focus {
+  border-color: rgb(248 113 113);
+  outline: none;
 }
 
 .form-select {
@@ -117,6 +167,65 @@ select,
   cursor: not-allowed;
 }
 
+.form-checkbox-sm {
+  width: 1rem;
+  height: 1rem;
+  padding: 0.125rem;
+}
+
+.form-checkbox-sm:checked {
+  background-size: 0.625rem;
+}
+
+.form-switch {
+  position: relative;
+  box-sizing: border-box;
+  width: 2.75rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgb(51 65 85);
+  background-color: rgb(15 23 42);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.form-switch::after {
+  content: '';
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 9999px;
+  background-color: rgb(148 163 184);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.form-switch-on {
+  border-color: rgb(52 211 153 / 0.45);
+  background-color: rgb(16 185 129 / 0.35);
+}
+
+.form-switch-on::after {
+  transform: translateX(1.25rem);
+  background-color: rgb(167 243 208);
+}
+
+.form-switch:focus-visible {
+  outline: 2px solid rgb(100 116 139);
+  outline-offset: 2px;
+}
+
+.form-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .form-field-icon-button {
   display: inline-flex;
   flex-shrink: 0;
@@ -139,6 +248,18 @@ select,
   box-sizing: border-box;
   height: calc(2px + 2rem + 1.25rem + 1rem + 14rem);
   min-height: 0;
+}
+
+/** Dashboard Recharts — display only; series toggles live outside the SVG. */
+.dashboard-chart {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dashboard-chart :is(svg, .recharts-wrapper, .recharts-surface):focus,
+.dashboard-chart :is(svg, .recharts-wrapper, .recharts-surface):focus-visible {
+  outline: none;
 }
 
 /** EUR amount cells: alignment only (width comes from `<col>` / table rules). */
@@ -251,20 +372,93 @@ select,
 .documents-table {
   table-layout: fixed;
   width: 100%;
+  max-width: 100%;
 }
 
-.documents-table col {
-  width: calc(100% / 7);
+.documents-table-scroll-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.documents-table col.documents-col-select {
+  width: 3%;
+  min-width: 2.75rem;
+}
+
+.documents-table col.documents-col-title {
+  width: 23%;
+}
+
+.documents-table col.documents-col-year {
+  width: 7%;
+}
+
+.documents-table col.documents-col-tag {
+  width: 14%;
+}
+
+.documents-table col.documents-col-type {
+  width: 11%;
+}
+
+.documents-table col.documents-col-size {
+  width: 9%;
+}
+
+.documents-table col.documents-col-date {
+  width: 11%;
+}
+
+.documents-table col.documents-col-actions {
+  width: 22%;
 }
 
 .documents-table :is(th, td) {
   padding: 0.75rem 1rem;
   vertical-align: middle;
-  text-align: center;
+  text-align: left;
+  overflow: hidden;
+}
+
+.documents-table td.truncate {
+  max-width: 0;
 }
 
 .documents-table th {
   font-weight: 500;
+}
+
+.documents-table .documents-cell-select {
+  width: 3%;
+  min-width: 2.75rem;
+  padding: 0.75rem 0 0.75rem 1rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.documents-table .documents-cell-select .form-checkbox {
+  display: block;
+  margin: 0;
+}
+
+.documents-table .documents-cell-actions {
+  padding-right: 0.75rem;
+  text-align: center;
+}
+
+.documents-table .documents-row-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.125rem;
+}
+
+.documents-table .documents-row-actions button {
+  border-radius: 0.5rem;
+  padding: 0.375rem;
 }
 
 /** Full-height route shell: toolbar fixed, list/table area scrolls internally. */
@@ -295,12 +489,247 @@ select,
   overscroll-behavior: contain;
   border-radius: 0.75rem;
   border: 1px solid rgb(30 41 59);
+}
+
+/** Recent purchases (Investments): horizontal scroll only, no stable scrollbar gutter. */
+.recent-purchases-shell {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(30 41 59);
+}
+
+.recent-purchases-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.recent-purchases-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 40rem;
+}
+
+.recent-purchases-table col.recent-purchases-col-date {
+  width: 6.75rem;
+}
+
+.recent-purchases-table col.recent-purchases-col-account {
+  width: 11rem;
+}
+
+.recent-purchases-table col.recent-purchases-col-money {
+  width: 8.25rem;
+}
+
+.recent-purchases-table col.recent-purchases-col-actions {
+  width: 5.5rem;
+}
+
+.recent-purchases-table :is(th, td).money-cell,
+.recent-purchases-table .recent-purchases-cell-actions {
+  text-align: center;
+}
+
+.recent-purchases-table .recent-purchases-cell-actions {
+  padding-left: 0.25rem;
+  padding-right: 0.5rem;
+}
+
+.recent-purchases-table :is(th, td) {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-purchases-table :is(th, td).money-cell {
+  text-align: center;
+}
+
+.recent-purchases-table :is(th, td):nth-child(3) {
+  white-space: nowrap;
+}
+
+.recent-purchases-table .recent-purchases-cell-instrument {
+  max-width: 0;
+}
+
+/** Shared uppercase header row (investments, transactions, accounts, documents). */
+.data-table-head {
+  background-color: rgb(2 6 23);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: rgb(148 163 184);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.data-table-head th {
+  font-weight: 500;
+}
+
+.investments-table thead.data-table-head th,
+.transactions-table thead.data-table-head th,
+.accounts-table thead.data-table-head th,
+.documents-table thead.data-table-head th,
+.recent-purchases-table thead.data-table-head th,
+.data-table-scroll-shell .data-table thead.data-table-head th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: rgb(2 6 23);
+  box-shadow: inset 0 -1px 0 rgb(30 41 59);
+}
+
+.recent-purchases-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.recent-purchases-table tbody tr:hover {
+  background-color: rgb(30 41 59 / 0.55);
+}
+
+.investments-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 60rem;
+}
+
+.investments-table col.investments-col-instrument {
+  width: 24%;
+}
+
+.investments-table col.investments-col-account {
+  width: 14%;
+}
+
+.investments-table col.investments-col-actions {
+  width: 5.5rem;
+}
+
+.investments-table col.investments-col-money {
+  width: calc((100% - 24% - 14% - 5.5rem) / 5);
+}
+
+.investments-table :is(th, td) {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.investments-table :is(th, td).money-cell,
+.investments-table .investments-cell-actions {
+  text-align: center;
+}
+
+.investments-table th {
+  font-weight: 500;
+}
+
+.investments-table .investments-cell-actions {
+  padding-left: 0.25rem;
+  padding-right: 0.5rem;
+}
+
+.investments-table .investments-cell-instrument {
+  max-width: 0;
+}
+
+/** Scrollable region inside a split shell (e.g. category list above a fixed footer). */
+.data-table-scroll-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/** Dark slate scrollbars (WebKit + Firefox). */
+.app-scrollbar,
+.data-table-scroll-body {
+  scrollbar-gutter: stable;
+}
+
+.data-table-scroll-shell {
+  scrollbar-gutter: auto;
+}
+
+/**
+ * Chrome 121+ applies `scrollbar-width` / `scrollbar-color` instead of
+ * `::-webkit-scrollbar-*`, which restores Windows classic arrows. Keep standard
+ * props for engines without WebKit scrollbar pseudos (Firefox).
+ */
+@supports not selector(::-webkit-scrollbar) {
+  .app-scrollbar,
+  .data-table-scroll-shell,
+  .data-table-scroll-body,
+  .recent-purchases-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139) rgb(15 23 42);
+  }
+}
+
+.app-scrollbar::-webkit-scrollbar,
+.data-table-scroll-shell::-webkit-scrollbar,
+.data-table-scroll-body::-webkit-scrollbar,
+.recent-purchases-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.app-scrollbar::-webkit-scrollbar-button,
+.data-table-scroll-shell::-webkit-scrollbar-button,
+.data-table-scroll-body::-webkit-scrollbar-button,
+.recent-purchases-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.app-scrollbar::-webkit-scrollbar-track,
+.data-table-scroll-shell::-webkit-scrollbar-track,
+.data-table-scroll-body::-webkit-scrollbar-track,
+.recent-purchases-scroll::-webkit-scrollbar-track {
+  background-color: rgb(15 23 42);
+  border-radius: 9999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb,
+.data-table-scroll-shell::-webkit-scrollbar-thumb,
+.data-table-scroll-body::-webkit-scrollbar-thumb,
+.recent-purchases-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105);
+  border-radius: 9999px;
+  border: 2px solid rgb(15 23 42);
+  background-clip: padding-box;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover,
+.data-table-scroll-shell::-webkit-scrollbar-thumb:hover,
+.data-table-scroll-body::-webkit-scrollbar-thumb:hover,
+.recent-purchases-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100 116 139);
+}
+
+.app-scrollbar::-webkit-scrollbar-corner,
+.data-table-scroll-shell::-webkit-scrollbar-corner,
+.data-table-scroll-body::-webkit-scrollbar-corner,
+.recent-purchases-scroll::-webkit-scrollbar-corner {
+  background-color: rgb(15 23 42);
+}
+
+/** Documents table: scroll with wheel/trackpad, no visible scrollbar. */
+.data-table-scroll-shell.documents-table-scroll-shell {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.data-table-scroll-shell::-webkit-scrollbar {
+.data-table-scroll-shell.documents-table-scroll-shell::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
 }
 
 .data-table-scroll-shell--embedded {
@@ -324,14 +753,6 @@ select,
 .data-table-scroll-shell--embedded .ledger-table th.money-cell,
 .data-table-scroll-shell--embedded .ledger-table td.money-cell {
   padding-right: 0.25rem;
-}
-
-.data-table-scroll-shell .data-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background-color: rgb(15 23 42 / 0.95);
-  box-shadow: 0 1px 0 rgb(30 41 59);
 }
 
 /** List rows outside `<table>` (categories, ledger). */

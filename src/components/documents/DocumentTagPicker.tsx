@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { DocumentCategoryRecord } from '../../db/repositories/model'
+import { APP_SCROLLBAR_CLASS } from '../../lib/scroll-ui'
 
 type DocumentTagPickerProps = {
   /** Tags currently used on any document (autocomplete). */
@@ -136,7 +137,7 @@ export function DocumentTagPicker({
         />
         {showDropdown ? (
           <ul
-            className="absolute inset-x-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 py-1 shadow-xl"
+            className={`absolute inset-x-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 py-1 shadow-xl ${APP_SCROLLBAR_CLASS}`}
             role="listbox"
           >
             {searchableTags.map((tag) => (
