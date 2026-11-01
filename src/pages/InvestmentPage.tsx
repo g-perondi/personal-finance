@@ -201,6 +201,8 @@ type OpeningForm = {
   openingDate: string
   quantity: string
   avgCostPerUnit: string
+  /** When true, posts an investment transaction on the account (cashflow). */
+  recordInvestmentTransaction: boolean
 }
 
 type PurchaseForm = {
@@ -223,6 +225,7 @@ const emptyOpeningForm = (accountId: string): OpeningForm => ({
   openingDate: todayRomeDateInputValue(),
   quantity: '',
   avgCostPerUnit: '',
+  recordInvestmentTransaction: false,
 })
 
 export function InvestmentPage() {
@@ -484,7 +487,7 @@ export function InvestmentPage() {
         openingDate: openingForm.openingDate,
         quantity,
         priceCentsPerUnit,
-        recordInvestmentTransaction: true,
+        recordInvestmentTransaction: openingForm.recordInvestmentTransaction,
       })
       setOpeningOpen(false)
       reloadHoldings()
@@ -583,319 +586,334 @@ export function InvestmentPage() {
 
   return (
     <div className="app-page p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-white">Investments</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-slate-700"
-            onClick={() => void refreshQuotes()}
-            disabled={loading || holdings.length === 0}
-          >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <RefreshCw className="size-4" aria-hidden />
-            )}
-            Refresh quotes
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-            onClick={openOpeningModal}
-          >
-            <Plus className="size-4" aria-hidden />
-            {addPositionButtonLabel(activeAssetTab)}
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white"
-            onClick={() => openPurchaseModal()}
-            disabled={tabHoldings.length === 0}
-          >
-            Record purchase
-          </button>
-        </div>
-      </header>
+      <div className="shrink-0">
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Investments</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-slate-700"
+              onClick={() => void refreshQuotes()}
+              disabled={loading || holdings.length === 0}
+            >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw className="size-4" aria-hidden />
+              )}
+              Refresh quotes
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+              onClick={openOpeningModal}
+            >
+              <Plus className="size-4" aria-hidden />
+              {addPositionButtonLabel(activeAssetTab)}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white"
+              onClick={() => openPurchaseModal()}
+              disabled={tabHoldings.length === 0}
+            >
+              Record purchase
+            </button>
+          </div>
+        </header>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {ASSET_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={pillClass(activeAssetTab === tab.id)}
-            onClick={() => setActiveAssetTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={pillClass(accountFilter === 'all')}
-          onClick={() => setAccountFilter('all')}
-        >
-          All accounts
-        </button>
-        {accounts.map((account) => (
-          <button
-            key={account.id}
-            type="button"
-            className={pillClass(accountFilter === account.id)}
-            onClick={() => setAccountFilter(account.id)}
-          >
-            {account.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-            Market value
-          </p>
-          <p className="mt-1 text-xl font-semibold text-white">
-            {tabTotals.marketValueCents === null
-              ? '—'
-              : formatCents(tabTotals.marketValueCents)}
-          </p>
-          {stale ? (
-            <p className="mt-1 text-xs text-amber-400">Stale or partial quotes</p>
-          ) : null}
-          {fetchedAt ? (
-            <p className="mt-1 text-xs text-slate-500">
-              Last updated {formatDateTimeInRome(fetchedAt)}
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-            Cost basis
-          </p>
-          <p className="mt-1 text-xl font-semibold text-white">
-            {formatCents(tabTotals.costBasisCents)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-            Unrealized P/L
-          </p>
-          <p className={`mt-1 text-xl font-semibold ${plToneClass(unrealizedCents)}`}>
-            {unrealizedCents === null ? '—' : formatCents(unrealizedCents)}
-          </p>
-          {unrealizedPercentLabel ? (
-            <p className={`mt-1 text-sm font-medium ${plToneClass(unrealizedCents)}`}>
-              {unrealizedPercentLabel}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      {errors.length > 0 ? (
-        <ul className="mb-4 list-inside list-disc text-sm text-amber-400">
-          {errors.map((message) => (
-            <li key={message}>{message}</li>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {ASSET_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={pillClass(activeAssetTab === tab.id)}
+              onClick={() => setActiveAssetTab(tab.id)}
+            >
+              {tab.label}
+            </button>
           ))}
-        </ul>
-      ) : null}
+        </div>
 
-      <div className="app-page-scroll-ceiling">
-        <table className="investments-table text-sm">
-          <colgroup>
-            <col className="investments-col-instrument" />
-            <col className="investments-col-money" />
-            <col className="investments-col-money" />
-            <col className="investments-col-money" />
-            <col className="investments-col-money" />
-            <col className="investments-col-money" />
-            <col className="investments-col-account" />
-            <col className="investments-col-actions" />
-          </colgroup>
-          <thead className="data-table-head">
-            <tr>
-              <th className="investments-cell-instrument px-3 py-2">Instrument</th>
-              <th className="money-cell px-3 py-2">Quantity</th>
-              <th className="money-cell px-3 py-2">Avg cost</th>
-              <th className="money-cell px-3 py-2">Last price</th>
-              <th className="money-cell px-3 py-2">Market value</th>
-              <th className="money-cell px-3 py-2">P/L</th>
-              <th className="px-3 py-2">Account</th>
-              <th className="investments-cell-actions px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800 text-slate-200">
-            {tabHoldings.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
-                  {emptyHoldingsMessage(activeAssetTab)}
-                </td>
-              </tr>
-            ) : (
-              tabHoldings.map((holding) => {
-                const avgCostEur = holding.totalCostCents / holding.quantity / 100
-                const lastPrice = priceEurByInstrumentId.get(holding.instrumentId)
-                const mvCents =
-                  lastPrice === undefined
-                    ? null
-                    : Math.round(holding.quantity * lastPrice * 100)
-                const plCents =
-                  mvCents === null ? null : mvCents - holding.totalCostCents
-                const plPercentLabel =
-                  plCents === null
-                    ? null
-                    : formatUnrealizedPercent(plCents, holding.totalCostCents)
-                return (
-                  <tr key={holding.id} className="hover:bg-slate-900/50">
-                    <td className="investments-cell-instrument px-3 py-2">
-                      <OverflowTooltip
-                        text={holding.instrumentName}
-                        className="font-medium text-white"
-                      >
-                        <div className="truncate text-xs text-slate-500">
-                          {formatInstrumentMetaLine(holding)}
-                        </div>
-                      </OverflowTooltip>
-                    </td>
-                    <td className="money-cell px-3 py-2">
-                      {formatQuantity(holding.quantity)}
-                    </td>
-                    <td className="money-cell px-3 py-2">
-                      {formatUnitPriceEur(avgCostEur)}
-                    </td>
-                    <td className="money-cell px-3 py-2">
-                      {lastPrice === undefined ? '—' : formatPriceEur(lastPrice)}
-                    </td>
-                    <td className="money-cell px-3 py-2">
-                      {mvCents === null ? '—' : formatCents(mvCents)}
-                    </td>
-                    <td className={`money-cell px-3 py-2 ${plToneClass(plCents)}`}>
-                      {plCents === null ? (
-                        '—'
-                      ) : (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span>{formatCents(plCents)}</span>
-                          {plPercentLabel ? (
-                            <span className="text-xs font-medium">
-                              {plPercentLabel}
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">{holding.accountName}</td>
-                    <td className="investments-cell-actions px-3 py-2">
-                      <div className="flex justify-center gap-1">
-                        <button
-                          type="button"
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
-                          title="Record purchase"
-                          onClick={() => openPurchaseModal(holding)}
-                        >
-                          <Plus className="size-4" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-red-400"
-                          title="Remove holding"
-                          onClick={() => setDeleteTargetId(holding.id)}
-                        >
-                          <Trash2 className="size-4" aria-hidden />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={pillClass(accountFilter === 'all')}
+            onClick={() => setAccountFilter('all')}
+          >
+            All accounts
+          </button>
+          {accounts.map((account) => (
+            <button
+              key={account.id}
+              type="button"
+              className={pillClass(accountFilter === account.id)}
+              onClick={() => setAccountFilter(account.id)}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Market value
+            </p>
+            <p className="mt-1 text-xl font-semibold text-white">
+              {tabTotals.marketValueCents === null
+                ? '—'
+                : formatCents(tabTotals.marketValueCents)}
+            </p>
+            {stale ? (
+              <p className="mt-1 text-xs text-amber-400">Stale or partial quotes</p>
+            ) : null}
+            {fetchedAt ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Last updated {formatDateTimeInRome(fetchedAt)}
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Cost basis
+            </p>
+            <p className="mt-1 text-xl font-semibold text-white">
+              {formatCents(tabTotals.costBasisCents)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Unrealized P/L
+            </p>
+            <p className={`mt-1 text-xl font-semibold ${plToneClass(unrealizedCents)}`}>
+              {unrealizedCents === null ? '—' : formatCents(unrealizedCents)}
+            </p>
+            {unrealizedPercentLabel ? (
+              <p className={`mt-1 text-sm font-medium ${plToneClass(unrealizedCents)}`}>
+                {unrealizedPercentLabel}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {errors.length > 0 ? (
+          <ul className="mb-4 list-inside list-disc text-sm text-amber-400">
+            {errors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
-      <section className="mt-10">
-        <h3 className="mb-3 text-lg font-semibold text-white">Recent purchases</h3>
-        <div className="recent-purchases-shell">
-          <div className="recent-purchases-scroll">
-            <table className="recent-purchases-table text-sm">
+      <div className="app-page-scroll-ceiling investments-split">
+        <section className="investments-panel investments-panel--holdings">
+          <h3 className="mb-3 shrink-0 text-lg font-semibold text-white">
+            Open positions
+          </h3>
+          <div
+            className={`data-table-scroll-shell min-h-0 min-w-0 flex-1 ${APP_SCROLLBAR_CLASS}`}
+          >
+            <table className="investments-table text-sm">
               <colgroup>
-                <col className="recent-purchases-col-date" />
-                <col />
-                <col className="recent-purchases-col-account" />
-                <col className="recent-purchases-col-money" />
-                <col className="recent-purchases-col-money" />
-                <col className="recent-purchases-col-money" />
-                <col className="recent-purchases-col-actions" />
+                <col className="investments-col-instrument" />
+                <col className="investments-col-money" />
+                <col className="investments-col-money" />
+                <col className="investments-col-money" />
+                <col className="investments-col-money" />
+                <col className="investments-col-money" />
+                <col className="investments-col-account" />
+                <col className="investments-col-actions" />
               </colgroup>
               <thead className="data-table-head">
                 <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="recent-purchases-cell-instrument px-3 py-2">
-                    Instrument
-                  </th>
+                  <th className="investments-cell-instrument px-3 py-2">Instrument</th>
+                  <th className="money-cell px-3 py-2">Quantity</th>
+                  <th className="money-cell px-3 py-2">Avg cost</th>
+                  <th className="money-cell px-3 py-2">Last price</th>
+                  <th className="money-cell px-3 py-2">Market value</th>
+                  <th className="money-cell px-3 py-2">P/L</th>
                   <th className="px-3 py-2">Account</th>
-                  <th className="money-cell px-3 py-2">Amount</th>
-                  <th className="money-cell px-3 py-2">NAV</th>
-                  <th className="money-cell px-3 py-2">Units</th>
-                  <th className="px-3 py-2">Actions</th>
+                  <th className="investments-cell-actions px-3 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-200">
-                {tabPurchases.length === 0 ? (
+                {tabHoldings.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                      No purchases recorded yet.
+                    <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                      {emptyHoldingsMessage(activeAssetTab)}
                     </td>
                   </tr>
                 ) : (
-                  tabPurchases.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-3 py-2">
-                        {formatItalianCalendarDateInRome(row.purchaseDate)}
-                      </td>
-                      <td className="recent-purchases-cell-instrument px-3 py-2">
-                        <OverflowTooltip text={row.instrumentName} />
-                      </td>
-                      <td className="px-3 py-2">{row.accountName}</td>
-                      <td className="money-cell px-3 py-2">
-                        {formatCents(row.amountCents)}
-                      </td>
-                      <td className="money-cell px-3 py-2">
-                        {formatUnitPriceEur(row.priceCentsPerUnit / 100)}
-                      </td>
-                      <td className="money-cell px-3 py-2">
-                        {formatQuantity(row.quantity)}
-                      </td>
-                      <td className="recent-purchases-cell-actions px-3 py-2">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            type="button"
-                            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
-                            title="Edit purchase"
-                            onClick={() => openEditPurchaseModal(row)}
+                  tabHoldings.map((holding) => {
+                    const avgCostEur = holding.totalCostCents / holding.quantity / 100
+                    const lastPrice = priceEurByInstrumentId.get(holding.instrumentId)
+                    const mvCents =
+                      lastPrice === undefined
+                        ? null
+                        : Math.round(holding.quantity * lastPrice * 100)
+                    const plCents =
+                      mvCents === null ? null : mvCents - holding.totalCostCents
+                    const plPercentLabel =
+                      plCents === null
+                        ? null
+                        : formatUnrealizedPercent(plCents, holding.totalCostCents)
+                    return (
+                      <tr key={holding.id} className="hover:bg-slate-900/50">
+                        <td className="investments-cell-instrument px-3 py-2">
+                          <OverflowTooltip
+                            text={holding.instrumentName}
+                            className="font-medium text-white"
                           >
-                            <Pencil className="size-4" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-red-400"
-                            title="Delete purchase"
-                            onClick={() => setDeletePurchaseTargetId(row.id)}
-                          >
-                            <Trash2 className="size-4" aria-hidden />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <div className="truncate text-xs text-slate-500">
+                              {formatInstrumentMetaLine(holding)}
+                            </div>
+                          </OverflowTooltip>
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {formatQuantity(holding.quantity)}
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {formatUnitPriceEur(avgCostEur)}
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {lastPrice === undefined ? '—' : formatPriceEur(lastPrice)}
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {mvCents === null ? '—' : formatCents(mvCents)}
+                        </td>
+                        <td className={`money-cell px-3 py-2 ${plToneClass(plCents)}`}>
+                          {plCents === null ? (
+                            '—'
+                          ) : (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span>{formatCents(plCents)}</span>
+                              {plPercentLabel ? (
+                                <span className="text-xs font-medium">
+                                  {plPercentLabel}
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{holding.accountName}</td>
+                        <td className="investments-cell-actions px-3 py-2">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+                              title="Record purchase"
+                              onClick={() => openPurchaseModal(holding)}
+                            >
+                              <Plus className="size-4" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-red-400"
+                              title="Remove holding"
+                              onClick={() => setDeleteTargetId(holding.id)}
+                            >
+                              <Trash2 className="size-4" aria-hidden />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section className="investments-panel investments-panel--purchases">
+          <h3 className="mb-3 shrink-0 text-lg font-semibold text-white">
+            Recent purchases
+          </h3>
+          <div className="recent-purchases-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div
+              className={`recent-purchases-scroll investments-recent-scroll ${APP_SCROLLBAR_CLASS}`}
+            >
+              <table className="recent-purchases-table text-sm">
+                <colgroup>
+                  <col className="recent-purchases-col-date" />
+                  <col />
+                  <col className="recent-purchases-col-account" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-actions" />
+                </colgroup>
+                <thead className="data-table-head">
+                  <tr>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="recent-purchases-cell-instrument px-3 py-2">
+                      Instrument
+                    </th>
+                    <th className="px-3 py-2">Account</th>
+                    <th className="money-cell px-3 py-2">Amount</th>
+                    <th className="money-cell px-3 py-2">NAV</th>
+                    <th className="money-cell px-3 py-2">Units</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 text-slate-200">
+                  {tabPurchases.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                        No purchases recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    tabPurchases.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-3 py-2">
+                          {formatItalianCalendarDateInRome(row.purchaseDate)}
+                        </td>
+                        <td className="recent-purchases-cell-instrument px-3 py-2">
+                          <OverflowTooltip text={row.instrumentName} />
+                        </td>
+                        <td className="px-3 py-2">{row.accountName}</td>
+                        <td className="money-cell px-3 py-2">
+                          {formatCents(row.amountCents)}
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {formatUnitPriceEur(row.priceCentsPerUnit / 100)}
+                        </td>
+                        <td className="money-cell px-3 py-2">
+                          {formatQuantity(row.quantity)}
+                        </td>
+                        <td className="recent-purchases-cell-actions px-3 py-2">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+                              title="Edit purchase"
+                              onClick={() => openEditPurchaseModal(row)}
+                            >
+                              <Pencil className="size-4" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-800 hover:text-red-400"
+                              title="Delete purchase"
+                              onClick={() => setDeletePurchaseTargetId(row.id)}
+                            >
+                              <Trash2 className="size-4" aria-hidden />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <Modal
         title="Add opening position"
@@ -1026,6 +1044,26 @@ export function InvestmentPage() {
             }
             return null
           })()}
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 rounded border-slate-600 bg-slate-800 text-emerald-600 focus:ring-emerald-500"
+              checked={openingForm.recordInvestmentTransaction}
+              onChange={(event) =>
+                setOpeningForm((prev) => ({
+                  ...prev,
+                  recordInvestmentTransaction: event.target.checked,
+                }))
+              }
+            />
+            <span>
+              Record as investment transaction
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Turn off for assets you already hold (portfolio only, no account
+                cashflow).
+              </span>
+            </span>
+          </label>
           <FormError message={formError} />
           <ModalActions
             onCancel={closeOpeningModal}
