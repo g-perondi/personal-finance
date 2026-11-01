@@ -42,10 +42,13 @@ npm run build:electron        # Frontend build with relative asset paths (./)
 npm run electron:pack           # Clear artifacts/, icons, build:electron (no installer)
 npm run electron:build:win      # Windows portable .exe under artifacts/ (run on Windows)
 npm run electron:build:mac      # macOS .dmg + .zip under artifacts/ (run on macOS)
+npm run electron:build:all      # Build for the current OS only (see platform notes)
 npm run electron:build          # Alias for electron:build:win
 ```
 
-**Platform notes:** `electron-builder` produces Windows installers only on Windows and macOS bundles only on macOS. There is no cross-compilation between them.
+**Both platforms:** `electron-builder` cannot cross-compile (Windows builds need Windows, macOS builds need macOS). To produce **both** installers, either run each script on the matching machine or trigger the **Electron build** GitHub Actions workflow (`.github/workflows/electron-build.yml`) on a tag `v*` or manually — it uploads Windows and macOS artifacts from the run.
+
+**Platform notes:** Each `electron:pack` clears `artifacts/` before packaging, so one local run produces one platform’s output at a time.
 
 **Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app.
 

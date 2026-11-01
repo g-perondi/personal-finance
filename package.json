@@ -15,6 +15,7 @@
     "electron:build": "npm run electron:build:win",
     "electron:build:win": "npm run electron:pack && electron-builder --win",
     "electron:build:mac": "npm run electron:pack && electron-builder --mac",
+    "electron:build:all": "node scripts/electron-build-all.mjs",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write .",
