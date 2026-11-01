@@ -104,6 +104,104 @@ let closeStaticServer = null
 /** @type {string | null} */
 let dataDirectoryPath = null
 let appQuitting = false
+/** @type {boolean} */
+let closePromptInFlight = false
+
+async function finishAppQuit() {
+  appQuitting = true
+  try {
+    await closeStaticServer?.()
+  } catch {
+    /* best effort */
+  }
+  closeStaticServer = null
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.destroy()
+    }
+  }
+  app.exit(0)
+}
+
+/**
+ * @param {import('electron').BrowserWindow} win
+ * @param {number} [timeoutMs]
+ */
+function requestQuitPrepFromRenderer(win, timeoutMs = 120_000) {
+  return new Promise((resolve, reject) => {
+    /** @type {NodeJS.Timeout} */
+    let timeout
+    function cleanup() {
+      clearTimeout(timeout)
+      ipcMain.removeListener('app:quit-prep-done', onDone)
+      ipcMain.removeListener('app:quit-prep-failed', onFailed)
+    }
+    function onDone() {
+      cleanup()
+      resolve(undefined)
+    }
+    /** @param {Electron.IpcMainEvent} _event */
+    function onFailed(_event, message) {
+      cleanup()
+      reject(new Error(typeof message === 'string' ? message : 'Sync failed'))
+    }
+    timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error('Sync timed out.'))
+    }, timeoutMs)
+    ipcMain.once('app:quit-prep-done', onDone)
+    ipcMain.once('app:quit-prep-failed', onFailed)
+    if (win.webContents.isDestroyed()) {
+      cleanup()
+      reject(new Error('Window unavailable.'))
+      return
+    }
+    win.webContents.send('app:quit-prep')
+  })
+}
+
+/**
+ * @param {import('electron').BrowserWindow} win
+ */
+async function handleMainWindowCloseAttempt(win) {
+  if (appQuitting || win.isDestroyed()) {
+    return
+  }
+
+  const hasDataDir = Boolean(dataDirectoryPath)
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'question',
+    buttons: ['Cancel', 'Exit'],
+    defaultId: 0,
+    cancelId: 0,
+    message: 'Exit Personal Finance?',
+    detail: hasDataDir
+      ? 'Open data will be synced to your configured folder, then the app will close.'
+      : 'Close the application?',
+  })
+  if (response !== 1) {
+    return
+  }
+
+  try {
+    await requestQuitPrepFromRenderer(win)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Sync failed'
+    const { response: forceResponse } = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Cancel', 'Exit without syncing'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'Could not sync before exit',
+      detail,
+    })
+    if (forceResponse !== 1) {
+      return
+    }
+  }
+
+  await finishAppQuit()
+}
 
 function resolveDataPath(relativePath) {
   if (!dataDirectoryPath) {
@@ -176,17 +274,7 @@ function registerDataDirectoryIpc() {
   })
 
   ipcMain.handle('app:quit', async () => {
-    appQuitting = true
-    try {
-      await closeStaticServer?.()
-    } catch {
-      /* best effort */
-    }
-    closeStaticServer = null
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.destroy()
-    }
-    app.quit()
+    await finishAppQuit()
   })
 
   ipcMain.handle('backup:save-as', async (_, defaultFileName, data) => {
@@ -250,10 +338,17 @@ async function createMainWindow() {
       return
     }
     event.preventDefault()
-    if (!mainWindow || mainWindow.webContents.isDestroyed()) {
+    if (closePromptInFlight) {
       return
     }
-    mainWindow.webContents.send('app:request-close')
+    const win = mainWindow
+    if (!win || win.isDestroyed()) {
+      return
+    }
+    closePromptInFlight = true
+    void handleMainWindowCloseAttempt(win).finally(() => {
+      closePromptInFlight = false
+    })
   })
 
   mainWindow.webContents.on('context-menu', (event) => {

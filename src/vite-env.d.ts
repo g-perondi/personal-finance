@@ -16,6 +16,7 @@ interface ElectronDesktopApi {
   dataDirectoryPathExists?: (relativePath: string) => Promise<boolean>
   saveBackupZipAs?: (defaultFileName: string, data: Uint8Array) => Promise<boolean>
   quit?: () => Promise<void>
+  registerQuitPrep?: (handler: () => Promise<void>) => () => void
   onRequestClose?: (handler: () => void) => () => void
 }
 

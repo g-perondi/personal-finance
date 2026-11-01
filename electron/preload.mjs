@@ -1,5 +1,35 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+/** @type {Set<() => void>} */
+const closeRequestHandlers = new Set()
+/** @type {(() => Promise<void>) | null} */
+let quitPrepHandler = null
+let pendingCloseRequest = false
+
+ipcRenderer.on('app:request-close', () => {
+  if (closeRequestHandlers.size === 0) {
+    pendingCloseRequest = true
+    return
+  }
+  for (const handler of closeRequestHandlers) {
+    handler()
+  }
+})
+
+ipcRenderer.on('app:quit-prep', () => {
+  void (async () => {
+    try {
+      if (quitPrepHandler) {
+        await quitPrepHandler()
+      }
+      ipcRenderer.send('app:quit-prep-done')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync failed'
+      ipcRenderer.send('app:quit-prep-failed', message)
+    }
+  })()
+})
+
 contextBridge.exposeInMainWorld('electronDesktop', {
   isElectron: true,
   pickDataDirectory: () => ipcRenderer.invoke('data-directory:pick'),
@@ -17,13 +47,22 @@ contextBridge.exposeInMainWorld('electronDesktop', {
   saveBackupZipAs: (defaultFileName, data) =>
     ipcRenderer.invoke('backup:save-as', defaultFileName, data),
   quit: () => ipcRenderer.invoke('app:quit'),
+  registerQuitPrep: (handler) => {
+    quitPrepHandler = handler
+    return () => {
+      if (quitPrepHandler === handler) {
+        quitPrepHandler = null
+      }
+    }
+  },
   onRequestClose: (handler) => {
-    const listener = () => {
+    closeRequestHandlers.add(handler)
+    if (pendingCloseRequest) {
+      pendingCloseRequest = false
       handler()
     }
-    ipcRenderer.on('app:request-close', listener)
     return () => {
-      ipcRenderer.removeListener('app:request-close', listener)
+      closeRequestHandlers.delete(handler)
     }
   },
 })
