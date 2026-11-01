@@ -4,6 +4,7 @@ import {
   saveDataDirectoryHandle,
 } from '../../db/idb'
 import { hasElectronDesktopBridge } from '../electron-shell'
+import { assertSafeDataDirectoryRelativePath } from './safe-path'
 import {
   BACKUPS_DIR,
   MANIFEST_JSON_PATH,
@@ -273,6 +274,7 @@ export async function pickDataDirectory(): Promise<string | null> {
 export async function readDataDirectoryFile(
   relativePath: string,
 ): Promise<ArrayBuffer | null> {
+  assertSafeDataDirectoryRelativePath(relativePath)
   if (isElectronDesktop()) {
     return readFileElectron(relativePath)
   }
@@ -286,6 +288,7 @@ export async function writeDataDirectoryFile(
   relativePath: string,
   data: ArrayBuffer | Uint8Array,
 ): Promise<void> {
+  assertSafeDataDirectoryRelativePath(relativePath)
   if (isElectronDesktop()) {
     await writeFileElectron(relativePath, data)
     return
@@ -297,6 +300,7 @@ export async function writeDataDirectoryFile(
 }
 
 export async function removeDataDirectoryPath(relativePath: string): Promise<void> {
+  assertSafeDataDirectoryRelativePath(relativePath)
   if (isElectronDesktop()) {
     await removePathElectron(relativePath)
     return
@@ -326,6 +330,7 @@ export async function wipeDataDirectoryContents(): Promise<void> {
 }
 
 export async function dataDirectoryPathExists(relativePath: string): Promise<boolean> {
+  assertSafeDataDirectoryRelativePath(relativePath)
   if (isElectronDesktop()) {
     return existsElectron(relativePath)
   }

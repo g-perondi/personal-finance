@@ -138,8 +138,18 @@ function resolveDataPath(relativePath) {
     throw new Error('Data directory is not configured.')
   }
   const safeRoot = path.resolve(dataDirectoryPath)
-  const filePath = path.resolve(safeRoot, relativePath)
-  if (!filePath.startsWith(safeRoot)) {
+  const normalized = String(relativePath).replace(/\\/g, '/').trim()
+  if (!normalized || normalized.startsWith('/') || normalized.includes('\0')) {
+    throw new Error('Invalid path.')
+  }
+  for (const part of normalized.split('/')) {
+    if (!part || part === '.' || part === '..') {
+      throw new Error('Invalid path.')
+    }
+  }
+  const filePath = path.resolve(safeRoot, normalized)
+  const relative = path.relative(safeRoot, filePath)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error('Invalid path.')
   }
   return filePath

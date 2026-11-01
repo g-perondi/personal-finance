@@ -1,3 +1,5 @@
+import { assertSafePathSegment } from './safe-path'
+
 export type DocumentFileErrorCode = 'missing_file' | 'directory_unavailable'
 
 export type DocumentFileReadResult =
@@ -27,5 +29,7 @@ export const MANIFEST_JSON_PATH = 'manifest.json'
 export const BACKUPS_DIR = 'backups'
 
 export function documentRelativePath(documentId: string, fileName: string): string {
-  return `documents/${documentId}/${fileName}`
+  const safeId = assertSafePathSegment(documentId, 'document id')
+  const safeName = assertSafePathSegment(fileName, 'document file name')
+  return `documents/${safeId}/${safeName}`
 }

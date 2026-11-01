@@ -37,7 +37,18 @@ export async function readDocumentFile(
       message: 'Document not found.',
     }
   }
-  const expectedRelativePath = documentRelativePath(documentId, doc.fileName)
+  let expectedRelativePath: string
+  try {
+    expectedRelativePath = documentRelativePath(documentId, doc.fileName)
+  } catch {
+    return {
+      ok: false,
+      code: 'missing_file',
+      expectedRelativePath: `documents/${documentId}/`,
+      message:
+        'Document file name is invalid. Re-upload or restore from a trusted backup.',
+    }
+  }
   const data = await readDataDirectoryFile(expectedRelativePath)
   if (!data) {
     return {
@@ -72,9 +83,17 @@ export async function listDocumentFileStatuses(
   const docs = listDocuments(db, {})
   return Promise.all(
     docs.map(async (doc) => {
-      const expectedRelativePath = documentRelativePath(doc.id, doc.fileName)
-      const ok = await dataDirectoryPathExists(expectedRelativePath)
-      return { documentId: doc.id, ok, expectedRelativePath }
+      try {
+        const expectedRelativePath = documentRelativePath(doc.id, doc.fileName)
+        const ok = await dataDirectoryPathExists(expectedRelativePath)
+        return { documentId: doc.id, ok, expectedRelativePath }
+      } catch {
+        return {
+          documentId: doc.id,
+          ok: false,
+          expectedRelativePath: `documents/${doc.id}/`,
+        }
+      }
     }),
   )
 }

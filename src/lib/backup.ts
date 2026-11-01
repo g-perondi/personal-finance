@@ -15,7 +15,7 @@ import {
   isDataDirectoryAvailable,
 } from './data-directory/storage'
 import { BACKUPS_DIR } from './data-directory/types'
-import { utcNowIso } from './datetime'
+import { DOCUMENT_MAX_BYTES } from './document-upload'
 import { hasElectronDesktopBridge } from './electron-shell'
 
 export const BACKUP_FORMAT_VERSION = 1
@@ -23,6 +23,10 @@ const MANIFEST_PATH = 'manifest.json'
 const SQLITE_PATH = 'sqlite.db'
 const BLOB_PREFIX = 'blobs/'
 const MAX_BACKUP_BYTES = 100 * 1024 * 1024
+const MAX_BACKUP_UNCOMPRESSED_BYTES = MAX_BACKUP_BYTES
+const MAX_BACKUP_ZIP_ENTRIES = 10_000
+const BACKUP_DOCUMENT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function isElectronDesktop(): boolean {
   return hasElectronDesktopBridge()
@@ -224,6 +228,76 @@ function blobIdsFromZip(entries: Record<string, Uint8Array>): string[] {
   return ids
 }
 
+type ZipEntryMeta = {
+  name: string
+  size: number
+  originalSize: number
+  compression: number
+}
+
+function assertBackupZipEntryName(name: string): void {
+  if (!name || name.includes('\\') || name.includes('/') || name.includes('\0')) {
+    throw new Error('Backup contains an invalid archive entry path.')
+  }
+  if (name.includes('..')) {
+    throw new Error('Backup contains an invalid archive entry path.')
+  }
+}
+
+function unzipBackupEntries(compressed: Uint8Array): Record<string, Uint8Array> {
+  let entryCount = 0
+  let totalUncompressed = 0
+
+  try {
+    return unzipSync(compressed, {
+      filter(file: ZipEntryMeta) {
+        entryCount += 1
+        if (entryCount > MAX_BACKUP_ZIP_ENTRIES) {
+          throw new Error('Backup contains too many archive entries.')
+        }
+
+        assertBackupZipEntryName(file.name)
+
+        if (file.originalSize < 0 || file.size < 0) {
+          throw new Error('Backup contains invalid archive entry sizes.')
+        }
+
+        if (file.name === MANIFEST_PATH || file.name === SQLITE_PATH) {
+          if (file.originalSize > MAX_BACKUP_BYTES) {
+            throw new Error('Backup entry exceeds the maximum allowed size (100 MB).')
+          }
+        } else if (file.name.startsWith(BLOB_PREFIX)) {
+          const id = file.name.slice(BLOB_PREFIX.length)
+          if (!BACKUP_DOCUMENT_ID_RE.test(id)) {
+            throw new Error('Backup contains an invalid document id.')
+          }
+          if (file.originalSize > DOCUMENT_MAX_BYTES) {
+            throw new Error('Backup document blob exceeds the maximum allowed size.')
+          }
+        } else {
+          throw new Error('Backup contains unexpected files.')
+        }
+
+        totalUncompressed += file.originalSize
+        if (totalUncompressed > MAX_BACKUP_UNCOMPRESSED_BYTES) {
+          throw new Error(
+            'Backup uncompressed size exceeds the maximum allowed (100 MB).',
+          )
+        }
+
+        return true
+      },
+    }) as Record<string, Uint8Array>
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unable to read backup file (not a valid ZIP archive).', {
+      cause: error,
+    })
+  }
+}
+
 export async function importBackupZip(file: File): Promise<void> {
   if (file.size > MAX_BACKUP_BYTES) {
     throw new Error('Backup file exceeds the maximum allowed size (100 MB).')
@@ -232,9 +306,11 @@ export async function importBackupZip(file: File): Promise<void> {
   const buffer = await file.arrayBuffer()
   let entries: Record<string, Uint8Array>
   try {
-    entries = unzipSync(new Uint8Array(buffer)) as Record<string, Uint8Array>
-  } catch {
-    throw new Error('Unable to read backup file (not a valid ZIP archive).')
+    entries = unzipBackupEntries(new Uint8Array(buffer))
+  } catch (error: unknown) {
+    throw error instanceof Error
+      ? error
+      : new Error('Unable to read backup file (not a valid ZIP archive).')
   }
 
   const manifestRaw = entries[MANIFEST_PATH]
@@ -278,9 +354,16 @@ export async function importBackupZip(file: File): Promise<void> {
       if (!doc) {
         return
       }
+      if (entry.byteLength > DOCUMENT_MAX_BYTES) {
+        throw new Error('Backup document blob exceeds the maximum allowed size.')
+      }
       const chunk = entry.slice()
       if (isDataDirectoryAvailable()) {
-        await writeDocumentFile(id, doc.fileName, chunk.buffer)
+        try {
+          await writeDocumentFile(id, doc.fileName, chunk.buffer)
+        } catch {
+          throw new Error(`Backup contains an invalid file name for document ${id}.`)
+        }
       }
     }),
   )
