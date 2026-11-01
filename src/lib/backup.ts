@@ -77,7 +77,10 @@ const BACKUP_ZIP_PICKER_TYPES = [
     description: 'Backup ZIP',
     accept: { 'application/zip': ['.zip'] },
   },
-] as const
+] satisfies {
+  description: string
+  accept: Record<string, string[]>
+}[]
 
 /** Must run early in a click handler (before long async work) when possible. */
 async function pickBrowserBackupSaveFile(
@@ -88,7 +91,7 @@ async function pickBrowserBackupSaveFile(
   }
   const options: {
     suggestedName: string
-    types: typeof BACKUP_ZIP_PICKER_TYPES
+    types: { description: string; accept: Record<string, string[]> }[]
     startIn?: FileSystemDirectoryHandle
   } = {
     suggestedName: fileName,

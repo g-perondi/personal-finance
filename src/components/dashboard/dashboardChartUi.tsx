@@ -1,4 +1,6 @@
-import type { CSSProperties, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, ComponentProps, MouseEvent, ReactNode } from 'react'
+import { type Tooltip } from 'recharts'
+import type { TooltipContentProps } from 'recharts'
 
 export const dashboardChartFontFamily = 'Inconsolata, ui-monospace, monospace'
 
@@ -146,16 +148,7 @@ export const dashboardBarChartTooltipCursor = {
   strokeWidth: 1,
 }
 
-export type DashboardChartTooltipPayload = {
-  active?: boolean
-  payload?: Array<{
-    dataKey?: string | number
-    name?: string
-    value?: number
-    color?: string
-  }>
-  label?: string | number
-}
+export type DashboardChartTooltipPayload = TooltipContentProps<number, string>
 
 type DashboardChartTooltipProps = DashboardChartTooltipPayload & {
   focusedKey: string | null
@@ -218,11 +211,14 @@ export function barFillOpacity(dataKey: string, focusedKey: string | null): numb
   return seriesStrokeOpacity(dataKey, focusedKey)
 }
 
+type RechartsTooltipContent = NonNullable<ComponentProps<typeof Tooltip>['content']>
+
 export function dashboardChartTooltipRenderer(
   focusedKey: string | null,
   series: DashboardChartSeries[],
-) {
-  return function RenderDashboardChartTooltip(props: DashboardChartTooltipPayload) {
+): RechartsTooltipContent {
+  function RenderDashboardChartTooltip(props: TooltipContentProps<number, string>) {
     return <DashboardChartTooltip {...props} focusedKey={focusedKey} series={series} />
   }
+  return RenderDashboardChartTooltip as RechartsTooltipContent
 }

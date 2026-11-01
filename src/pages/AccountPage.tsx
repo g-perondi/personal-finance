@@ -281,7 +281,6 @@ export function AccountPage() {
                           <Star
                             className="size-3.5 shrink-0 fill-amber-400/90 text-amber-400/90"
                             aria-label="Default account"
-                            title="Default account"
                           />
                         ) : null}
                         <span className="min-w-0 truncate">{account.name}</span>

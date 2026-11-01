@@ -189,8 +189,8 @@ async function writeFileBrowser(
   const fileName = parts[parts.length - 1]!
   const fileHandle = await dir.getFileHandle(fileName, { create: true })
   const writable = await fileHandle.createWritable()
-  const chunk = data instanceof Uint8Array ? data : new Uint8Array(data)
-  await writable.write(chunk)
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+  await writable.write(new Uint8Array(bytes))
   await writable.close()
 }
 
