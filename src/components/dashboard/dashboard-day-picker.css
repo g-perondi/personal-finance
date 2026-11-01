@@ -42,3 +42,8 @@
 .dashboard-day-picker .rdp-today:not(.rdp-selected) .rdp-day_button {
   color: rgb(125 211 252);
 }
+
+/** RomeCalendarDateInput: month/year shown in custom header above the grid. */
+.dashboard-day-picker--custom-nav .rdp-month_caption {
+  display: none;
+}

@@ -1,20 +1,30 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TZDateMini } from '@date-fns/tz'
 import { format } from 'date-fns'
-import { Calendar } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/style.css'
 import '../dashboard/dashboard-day-picker.css'
 import {
+  CalendarMonthGrid,
+  CalendarYearGrid,
+  calendarYearMonthKey,
+  defaultCalendarPickerBounds,
+} from './CalendarPickerGrids'
+import { FORM_PICKER_PANEL_CLASS } from './formPickerUi'
+import {
   DISPLAY_TIME_ZONE,
   formatRomeCalendarDateInputItalian,
   parseItalianCalendarDateInput,
+  todayRomeDateInputValue,
 } from '../../lib/datetime'
 
 const PICKER_LAYER_Z = 100
 const PICKER_ESTIMATED_HEIGHT = 360
 const VIEWPORT_MARGIN = 8
+
+type PickerPanelMode = 'days' | 'months' | 'years'
 
 type RomeCalendarDateInputProps = {
   value: string
@@ -69,13 +79,20 @@ function computePickerPosition(
   return { top, left }
 }
 
+function dateToViewMonth(calendarDate: string | undefined): Date {
+  if (calendarDate) {
+    return calendarDateToDate(calendarDate)
+  }
+  return calendarDateToDate(todayRomeDateInputValue())
+}
+
 export function RomeCalendarDateInput({
   value,
   onChange,
   id: idProp,
   placeholder = 'dd/mm/yyyy',
   className = '',
-  inputClassName = 'rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white',
+  inputClassName = 'form-field',
 }: RomeCalendarDateInputProps) {
   const generatedId = useId()
   const id = idProp ?? generatedId
@@ -89,7 +106,24 @@ export function RomeCalendarDateInput({
   })
   const [focused, setFocused] = useState(false)
   const [text, setText] = useState('')
+  const [panelMode, setPanelMode] = useState<PickerPanelMode>('days')
+  const [viewMonth, setViewMonth] = useState<Date>(() => dateToViewMonth(value))
+  const [viewYear, setViewYear] = useState(() => dateToViewMonth(value).getFullYear())
+  const bounds = useMemo(() => defaultCalendarPickerBounds(), [])
   const inputValue = focused ? text : formatRomeCalendarDateInputItalian(value)
+
+  const selectedYearMonth = useMemo(
+    () => calendarYearMonthKey(viewMonth.getFullYear(), viewMonth.getMonth()),
+    [viewMonth],
+  )
+
+  function openPicker() {
+    const nextMonth = dateToViewMonth(value)
+    setViewMonth(nextMonth)
+    setViewYear(nextMonth.getFullYear())
+    setPanelMode('days')
+    setPickerOpen(true)
+  }
 
   function updatePickerPosition() {
     const anchor = anchorRef.current
@@ -121,7 +155,7 @@ export function RomeCalendarDateInput({
       return
     }
     updatePickerPosition()
-  }, [pickerOpen, value])
+  }, [pickerOpen, value, panelMode])
 
   useEffect(() => {
     if (!pickerOpen) {
@@ -174,7 +208,43 @@ export function RomeCalendarDateInput({
     setPickerOpen(false)
   }
 
+  function shiftViewMonth(delta: number) {
+    setViewMonth((current) => {
+      const inRome = new TZDateMini(current, DISPLAY_TIME_ZONE)
+      const next = new TZDateMini(
+        inRome.getFullYear(),
+        inRome.getMonth() + delta,
+        1,
+        DISPLAY_TIME_ZONE,
+      )
+      setViewYear(next.getFullYear())
+      return next
+    })
+  }
+
+  function handleYearSelect(year: number) {
+    setViewYear(year)
+    setViewMonth((current) => {
+      const inRome = new TZDateMini(current, DISPLAY_TIME_ZONE)
+      return new TZDateMini(year, inRome.getMonth(), 1, DISPLAY_TIME_ZONE)
+    })
+    setPanelMode('months')
+  }
+
+  function handleMonthSelect(yearMonth: string) {
+    const year = Number(yearMonth.slice(0, 4))
+    const monthIndex = Number(yearMonth.slice(5, 7)) - 1
+    setViewYear(year)
+    setViewMonth(new TZDateMini(year, monthIndex, 1, DISPLAY_TIME_ZONE))
+    setPanelMode('days')
+  }
+
   const selected = value ? calendarDateToDate(value) : undefined
+  const viewMonthRome = new TZDateMini(viewMonth, DISPLAY_TIME_ZONE)
+  const minYearMonth = `${bounds.minYear}-01`
+  const maxYearMonth = `${bounds.maxYear}-12`
+  const canPrevMonth = selectedYearMonth > minYearMonth
+  const canNextMonth = selectedYearMonth < maxYearMonth
 
   const pickerPortal = pickerOpen
     ? createPortal(
@@ -187,15 +257,81 @@ export function RomeCalendarDateInput({
             left: pickerPosition.left,
             zIndex: PICKER_LAYER_Z,
           }}
-          className="rounded-2xl border border-slate-600/50 bg-slate-900/95 p-3 shadow-2xl ring-1 shadow-black/50 ring-white/10 backdrop-blur-sm"
+          className={`p-3 ${FORM_PICKER_PANEL_CLASS}`}
         >
-          <DayPicker
-            mode="single"
-            className="dashboard-day-picker"
-            defaultMonth={selected}
-            selected={selected}
-            onSelect={handlePickerSelect}
-          />
+          {panelMode === 'years' ? (
+            <CalendarYearGrid
+              bounds={bounds}
+              selectedYear={viewYear}
+              onSelect={handleYearSelect}
+            />
+          ) : null}
+
+          {panelMode === 'months' ? (
+            <CalendarMonthGrid
+              bounds={bounds}
+              viewYear={viewYear}
+              onViewYearChange={setViewYear}
+              selectedYearMonth={selectedYearMonth}
+              onSelect={handleMonthSelect}
+            />
+          ) : null}
+
+          {panelMode === 'days' ? (
+            <>
+              <div className="mb-2 flex items-center justify-between gap-1">
+                <button
+                  type="button"
+                  aria-label="Previous month"
+                  disabled={!canPrevMonth}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                  onClick={() => shiftViewMonth(-1)}
+                >
+                  <ChevronLeft className="size-4" aria-hidden />
+                </button>
+                <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
+                  <button
+                    type="button"
+                    className="truncate rounded-xl px-2 py-1 text-sm font-semibold text-white hover:bg-slate-800"
+                    onClick={() => {
+                      setViewYear(viewMonthRome.getFullYear())
+                      setPanelMode('months')
+                    }}
+                  >
+                    {format(viewMonthRome, 'MMMM')}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl px-2 py-1 text-sm font-semibold text-white tabular-nums hover:bg-slate-800"
+                    onClick={() => {
+                      setViewYear(viewMonthRome.getFullYear())
+                      setPanelMode('years')
+                    }}
+                  >
+                    {viewMonthRome.getFullYear()}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Next month"
+                  disabled={!canNextMonth}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                  onClick={() => shiftViewMonth(1)}
+                >
+                  <ChevronRight className="size-4" aria-hidden />
+                </button>
+              </div>
+              <DayPicker
+                mode="single"
+                className="dashboard-day-picker dashboard-day-picker--custom-nav"
+                month={viewMonth}
+                onMonthChange={setViewMonth}
+                hideNavigation
+                selected={selected}
+                onSelect={handlePickerSelect}
+              />
+            </>
+          ) : null}
         </div>,
         document.body,
       )
@@ -235,8 +371,8 @@ export function RomeCalendarDateInput({
           aria-label="Open calendar"
           aria-expanded={pickerOpen}
           aria-controls={`${id}-calendar`}
-          onClick={() => setPickerOpen((open) => !open)}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 px-3 text-slate-300 hover:bg-slate-800 hover:text-white"
+          onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
+          className="form-field-icon-button"
         >
           <Calendar className="size-5" aria-hidden />
         </button>
