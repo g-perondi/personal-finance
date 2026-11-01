@@ -197,8 +197,9 @@ export function LocalDataSection() {
       <Modal title="Clear all local data?" open={clearOpen} onClose={closeClearModal}>
         <p className="text-sm text-slate-300">
           This deletes every account, transaction, category, and document on this
-          device, including uploaded files. The app will reload with an empty database.
-          Download a backup first if you need to keep anything.
+          device, including uploaded files. If a data folder is connected, its synced
+          files are removed and the folder link is cleared. The app will reload with an
+          empty database. Download a backup first if you need to keep anything.
         </p>
         <label className="mt-4 block">
           <span className="mb-2 block text-sm text-slate-400">

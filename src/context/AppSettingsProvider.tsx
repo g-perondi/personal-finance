@@ -120,7 +120,7 @@ export function AppSettingsProvider({ children }: AppSettingsProviderProps) {
       }
 
       try {
-        if (!isDataDirectoryAvailable()) {
+        if (!initial.dataDirectoryPath?.trim() || !isDataDirectoryAvailable()) {
           return
         }
         const folderLabel = await resolveDataDirectoryDisplayPath(

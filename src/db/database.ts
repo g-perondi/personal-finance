@@ -1,5 +1,10 @@
 import type { Database } from 'sql.js'
 import {
+  disconnectDataDirectory,
+  isDataDirectoryAvailable,
+  wipeDataDirectoryContents,
+} from '../lib/data-directory/storage'
+import {
   clearDocumentBlobStore,
   deleteSnapshot,
   loadSnapshot,
@@ -156,6 +161,10 @@ export async function clearAllLocalData(): Promise<void> {
     clearTimeout(persistTimer)
     persistTimer = null
   }
+  if (isDataDirectoryAvailable()) {
+    await wipeDataDirectoryContents()
+  }
+  await disconnectDataDirectory()
   if (dbInstance) {
     dbInstance.close()
     dbInstance = null

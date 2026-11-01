@@ -4,6 +4,12 @@ import {
   saveDataDirectoryHandle,
 } from '../../db/idb'
 import { hasElectronDesktopBridge } from '../electron-shell'
+import {
+  BACKUPS_DIR,
+  MANIFEST_JSON_PATH,
+  SETTINGS_JSON_PATH,
+  SQLITE_DB_PATH,
+} from './types'
 
 function isElectronDesktop(): boolean {
   return hasElectronDesktopBridge()
@@ -298,6 +304,27 @@ export async function removeDataDirectoryPath(relativePath: string): Promise<voi
   await removePathBrowser(relativePath)
 }
 
+/** Removes synced app files from the connected data folder (best effort). */
+export async function wipeDataDirectoryContents(): Promise<void> {
+  if (!isDataDirectoryAvailable()) {
+    return
+  }
+  const paths = [
+    'documents',
+    BACKUPS_DIR,
+    SQLITE_DB_PATH,
+    SETTINGS_JSON_PATH,
+    MANIFEST_JSON_PATH,
+  ]
+  for (const relativePath of paths) {
+    try {
+      await removeDataDirectoryPath(relativePath)
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
 export async function dataDirectoryPathExists(relativePath: string): Promise<boolean> {
   if (isElectronDesktop()) {
     return existsElectron(relativePath)
@@ -329,19 +356,22 @@ export async function initDataDirectoryFromSettings(
   displayPath: string | null,
 ): Promise<void> {
   if (isElectronDesktop()) {
-    if (displayPath) {
+    if (displayPath?.trim()) {
       await window.electronDesktop?.setDataDirectoryPath?.(displayPath)
       const resolved = await window.electronDesktop?.getDataDirectoryPath?.()
       electronDataDirectoryPath =
         typeof resolved === 'string' && resolved.trim() ? resolved : displayPath
     } else {
-      const fromMain = await window.electronDesktop?.getDataDirectoryPath?.()
-      electronDataDirectoryPath =
-        typeof fromMain === 'string' && fromMain.trim() ? fromMain : null
+      electronDataDirectoryPath = null
+      await window.electronDesktop?.setDataDirectoryPath?.(null)
     }
     return
   }
-  await restoreBrowserDirectoryHandle()
+  if (displayPath?.trim()) {
+    await restoreBrowserDirectoryHandle()
+    return
+  }
+  await disconnectBrowserDataDirectory()
 }
 
 /** Applies a picked folder to the runtime handle without persisting to app settings. */
@@ -400,10 +430,12 @@ export async function resolveDataDirectoryDisplayPath(
   settingsPath: string | null,
 ): Promise<string | null> {
   if (isElectronDesktop()) {
-    const fromMain = await window.electronDesktop?.getDataDirectoryPath?.()
-    if (typeof fromMain === 'string' && fromMain.trim()) {
-      electronDataDirectoryPath = fromMain
-      return fromMain
+    if (settingsPath?.trim()) {
+      const fromMain = await window.electronDesktop?.getDataDirectoryPath?.()
+      if (typeof fromMain === 'string' && fromMain.trim()) {
+        electronDataDirectoryPath = fromMain
+        return fromMain
+      }
     }
     if (electronDataDirectoryPath) {
       return electronDataDirectoryPath
