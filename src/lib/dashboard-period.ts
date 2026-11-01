@@ -5,7 +5,7 @@ import {
   currentRomeYear,
   currentRomeYearMonth,
   daysInRomeMonth,
-  DISPLAY_TIME_ZONE,
+  getDisplayTimeZone,
   formatRomeMonthLabel,
   romeDayUtcBounds,
   romeMonthUtcBounds,
@@ -206,7 +206,7 @@ function shiftDashboardPeriodRaw(
     }
   }
   const [y, m, d] = period.calendarDate.split('-').map(Number)
-  const next = new TZDateMini(y!, m! - 1, d! + delta, DISPLAY_TIME_ZONE)
+  const next = new TZDateMini(y!, m! - 1, d! + delta, getDisplayTimeZone())
   return { scope: 'day', calendarDate: format(next, 'yyyy-MM-dd') }
 }
 
@@ -273,7 +273,7 @@ export function formatDashboardPeriodLabel(
   }
   if (aligned.scope === 'day') {
     const [y, m, d] = aligned.calendarDate.split('-').map(Number)
-    const inRome = new TZDateMini(y!, m! - 1, d!, DISPLAY_TIME_ZONE)
+    const inRome = new TZDateMini(y!, m! - 1, d!, getDisplayTimeZone())
     return format(inRome, 'EEE, d MMM yyyy')
   }
   return String(currentRomeYear())

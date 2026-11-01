@@ -7,14 +7,13 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { CashflowChartWidget } from '../components/dashboard/CashflowChartWidget'
 import { DashboardPeriodToolbar } from '../components/dashboard/DashboardPeriodToolbar'
 import { DashboardScopeBar } from '../components/dashboard/DashboardScopeBar'
 import { LedgerTableWidget } from '../components/dashboard/LedgerTableWidget'
 import { KpiWidget } from '../components/dashboard/KpiWidget'
 import { WealthChartWidget } from '../components/dashboard/WealthChartWidget'
-import { getEarliestAccountYearInRome } from '../db/repositories/account'
 import {
   countLedgerInPeriod,
   getCashflowTrendByYear,
@@ -27,14 +26,9 @@ import {
   listLedgerInPeriod,
 } from '../db/repositories/dashboard'
 import {
-  clampPeriodForDashboard,
-  coercePeriodForScope,
-  defaultDashboardPeriod,
   periodBounds,
   yearFromPeriod,
   yearMonthFromPeriod,
-  type DashboardPeriod,
-  type DashboardScope,
 } from '../lib/dashboard-period'
 import {
   formatSavingsRate,
@@ -43,18 +37,20 @@ import {
   savingsRate,
   savingsRateDeltaPp,
 } from '../lib/savings'
-import { formatCents } from '../lib/money'
 import { amountColorClass, signedAmountColorClass } from '../lib/amount-colors'
+import { formatCents } from '../lib/money'
+import { APP_SCROLLBAR_CLASS } from '../lib/scroll-ui'
+import { useDashboardPeriod } from '../hooks/useDashboardPeriod'
 import { useDatabase } from '../hooks/useDatabase'
 import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
+import { useAppSettings } from '../context/AppSettingsProvider'
 
 export function DashboardPage() {
   const db = useDatabase()
+  const { settings } = useAppSettings()
+  const investmentsEnabled = settings.investmentsEnabled
   const portfolio = usePortfolioQuotes()
-  const [scope, setScope] = useState<DashboardScope>('global')
-  const [period, setPeriod] = useState<DashboardPeriod>(() => defaultDashboardPeriod())
-
-  const earliestYear = useMemo(() => getEarliestAccountYearInRome(db), [db])
+  const { scope, period, earliestYear, setScope, setPeriod } = useDashboardPeriod()
   const bounds = useMemo(
     () => periodBounds(period, earliestYear),
     [period, earliestYear],
@@ -130,10 +126,11 @@ export function DashboardPage() {
         key="wealth"
         title="Wealth"
         data={wealthData}
+        showInvestments={investmentsEnabled}
         className="dashboard-row1-panel-h min-w-0 lg:col-start-1 lg:row-start-1"
       />
     )
-  }, [scope, data])
+  }, [scope, data, investmentsEnabled])
 
   const belowRowPanels = useMemo(() => {
     if (scope === 'global') {
@@ -142,6 +139,7 @@ export function DashboardPage() {
           key="cashflow"
           title="Cashflow"
           data={data.cashflowByYear}
+          showInvestments={investmentsEnabled}
         />,
       ]
     }
@@ -151,6 +149,7 @@ export function DashboardPage() {
           key="cashflow"
           title="Cashflow"
           data={data.cashflowYear}
+          showInvestments={investmentsEnabled}
         />,
       ]
     }
@@ -159,18 +158,10 @@ export function DashboardPage() {
         key="cashflow"
         title="Cashflow"
         data={data.cashflowSingle}
+        showInvestments={investmentsEnabled}
       />,
     ]
-  }, [scope, data])
-
-  function handleScopeChange(next: DashboardScope) {
-    setScope(next)
-    setPeriod((current) => coercePeriodForScope(next, current, earliestYear))
-  }
-
-  function handlePeriodChange(next: DashboardPeriod) {
-    setPeriod(clampPeriodForDashboard(next, earliestYear))
-  }
+  }, [scope, data, investmentsEnabled])
 
   const deltaLabel =
     data.deltaPp === null
@@ -187,7 +178,7 @@ export function DashboardPage() {
       valueClassName: amountColorClass.wealth,
       iconClassName: amountColorClass.wealth,
     },
-    ...(portfolio.holdings.length > 0
+    ...(investmentsEnabled && portfolio.holdings.length > 0
       ? [
           {
             label: 'Portfolio value',
@@ -215,13 +206,17 @@ export function DashboardPage() {
       valueClassName: amountColorClass.outflow,
       iconClassName: amountColorClass.outflow,
     },
-    {
-      label: 'Investments',
-      icon: TrendingUp,
-      value: formatCents(data.totals.investmentCents),
-      valueClassName: amountColorClass.investment,
-      iconClassName: amountColorClass.investment,
-    },
+    ...(investmentsEnabled
+      ? [
+          {
+            label: 'Investments',
+            icon: TrendingUp,
+            value: formatCents(data.totals.investmentCents),
+            valueClassName: amountColorClass.investment,
+            iconClassName: amountColorClass.investment,
+          },
+        ]
+      : []),
     {
       label: 'Net balance',
       icon: Wallet,
@@ -240,7 +235,9 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-8">
+    <div
+      className={`flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-8 ${APP_SCROLLBAR_CLASS}`}
+    >
       <header className="border-b border-slate-800 pb-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
           <div className="md:justify-self-start">
@@ -252,12 +249,12 @@ export function DashboardPage() {
               scope={scope}
               period={period}
               earliestYear={earliestYear}
-              onPeriodChange={handlePeriodChange}
+              onPeriodChange={setPeriod}
             />
           </div>
 
           <div className="flex justify-center md:justify-self-end">
-            <DashboardScopeBar scope={scope} onScopeChange={handleScopeChange} />
+            <DashboardScopeBar scope={scope} onScopeChange={setScope} />
           </div>
         </div>
       </header>

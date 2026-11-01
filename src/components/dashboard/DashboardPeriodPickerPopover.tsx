@@ -11,7 +11,8 @@ import {
   periodForScope,
   yearFromPeriod,
 } from '../../lib/dashboard-period'
-import { DISPLAY_TIME_ZONE } from '../../lib/datetime'
+import { getDisplayTimeZone } from '../../lib/datetime'
+import { APP_SCROLLBAR_CLASS } from '../../lib/scroll-ui'
 
 const PANEL_CLASS =
   'rounded-2xl border border-slate-600/50 bg-slate-900/95 p-4 shadow-2xl shadow-black/50 ring-1 ring-white/10 backdrop-blur-sm'
@@ -34,11 +35,11 @@ type DashboardPeriodPickerPopoverProps = {
 
 function calendarDateToDate(calendarDate: string): Date {
   const [y, m, d] = calendarDate.split('-').map(Number)
-  return new TZDateMini(y!, m! - 1, d!, DISPLAY_TIME_ZONE)
+  return new TZDateMini(y!, m! - 1, d!, getDisplayTimeZone())
 }
 
 function dateToCalendarDate(date: Date): string {
-  const inRome = new TZDateMini(date, DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(date, getDisplayTimeZone())
   return format(inRome, 'yyyy-MM-dd')
 }
 
@@ -109,7 +110,7 @@ export function DashboardPeriodPickerPopover({
         <div className="dashboard-day-picker">
           <DayPicker
             mode="single"
-            timeZone={DISPLAY_TIME_ZONE}
+            timeZone={getDisplayTimeZone()}
             required
             defaultMonth={calendarDateToDate(aligned.calendarDate)}
             selected={calendarDateToDate(aligned.calendarDate)}
@@ -150,7 +151,9 @@ function YearPickerGrid({
   }, [bounds.maxYear, bounds.minYear])
 
   return (
-    <div className="grid max-h-64 w-56 grid-cols-3 gap-1.5 overflow-y-auto p-0.5">
+    <div
+      className={`grid max-h-64 w-56 grid-cols-3 gap-1.5 overflow-y-auto p-0.5 ${APP_SCROLLBAR_CLASS}`}
+    >
       {years.map((year) => (
         <button
           key={year}
