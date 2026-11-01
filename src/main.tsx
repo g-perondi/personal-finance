@@ -10,6 +10,7 @@ import './index.css'
 import { installContextMenuBlock } from './lib/disable-context-menu.ts'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
 import { ElectronWindowClose } from './components/ElectronWindowClose.tsx'
+import { ElectronDesktopTitleBar } from './components/ElectronDesktopTitleBar.tsx'
 
 installContextMenuBlock()
 
@@ -18,15 +19,20 @@ createRoot(document.getElementById('root')!).render(
     <AppErrorBoundary>
       <DbProvider>
         <ElectronWindowClose />
-        <DbGate>
-          <BrowserRouter>
-            <AppSettingsProvider>
-              <DashboardPeriodProvider>
-                <App />
-              </DashboardPeriodProvider>
-            </AppSettingsProvider>
-          </BrowserRouter>
-        </DbGate>
+        <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-slate-950">
+          <ElectronDesktopTitleBar />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <DbGate>
+              <BrowserRouter>
+                <AppSettingsProvider>
+                  <DashboardPeriodProvider>
+                    <App />
+                  </DashboardPeriodProvider>
+                </AppSettingsProvider>
+              </BrowserRouter>
+            </DbGate>
+          </div>
+        </div>
       </DbProvider>
     </AppErrorBoundary>
   </StrictMode>,

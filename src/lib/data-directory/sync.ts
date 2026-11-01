@@ -56,7 +56,10 @@ async function buildManifest(db = getDatabase()): Promise<DataDirectoryManifest>
   }
 }
 
-export async function syncToDataDirectory(settings: AppSettings): Promise<void> {
+export async function syncToDataDirectory(
+  settings: AppSettings,
+  options?: { skipLegacyBlobMigration?: boolean },
+): Promise<void> {
   if (!isDataDirectoryAvailable()) {
     throw new Error('Data directory is not configured.')
   }
@@ -70,7 +73,9 @@ export async function syncToDataDirectory(settings: AppSettings): Promise<void> 
     encodeJson(buildSettingsJson(settings)),
   )
   await ensureDataDirectorySubdir(BACKUPS_DIR)
-  await migrateLegacyDocumentBlobsToDirectory(db)
+  if (!options?.skipLegacyBlobMigration) {
+    await migrateLegacyDocumentBlobsToDirectory(db)
+  }
   await clearDocumentBlobStore()
 }
 

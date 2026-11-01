@@ -2,8 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 /** @type {Set<() => void>} */
 const closeRequestHandlers = new Set()
-/** @type {(() => Promise<void>) | null} */
-let quitPrepHandler = null
 let pendingCloseRequest = false
 
 ipcRenderer.on('app:request-close', () => {
@@ -14,20 +12,6 @@ ipcRenderer.on('app:request-close', () => {
   for (const handler of closeRequestHandlers) {
     handler()
   }
-})
-
-ipcRenderer.on('app:quit-prep', () => {
-  void (async () => {
-    try {
-      if (quitPrepHandler) {
-        await quitPrepHandler()
-      }
-      ipcRenderer.send('app:quit-prep-done')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Sync failed'
-      ipcRenderer.send('app:quit-prep-failed', message)
-    }
-  })()
 })
 
 contextBridge.exposeInMainWorld('electronDesktop', {
@@ -47,12 +31,18 @@ contextBridge.exposeInMainWorld('electronDesktop', {
   saveBackupZipAs: (defaultFileName, data) =>
     ipcRenderer.invoke('backup:save-as', defaultFileName, data),
   quit: () => ipcRenderer.invoke('app:quit'),
-  registerQuitPrep: (handler) => {
-    quitPrepHandler = handler
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
+  requestCloseWindow: () => {
+    ipcRenderer.send('window:request-close')
+  },
+  onWindowMaximizedChange: (handler) => {
+    const listener = (_event, maximized) => {
+      handler(Boolean(maximized))
+    }
+    ipcRenderer.on('window:maximized-changed', listener)
     return () => {
-      if (quitPrepHandler === handler) {
-        quitPrepHandler = null
-      }
+      ipcRenderer.removeListener('window:maximized-changed', listener)
     }
   },
   onRequestClose: (handler) => {

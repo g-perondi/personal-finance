@@ -309,7 +309,7 @@ export function AppSettingsProvider({ children }: AppSettingsProviderProps) {
 
   if (loading) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-slate-950 text-slate-300">
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-slate-950 text-slate-300">
         <p>{syncMessage ?? 'Loading settings…'}</p>
       </div>
     )

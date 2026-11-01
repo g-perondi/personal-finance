@@ -11,7 +11,7 @@ export function DbGate({ children }: DbGateProps) {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 text-slate-200">
+      <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-4 bg-slate-950 text-slate-200">
         <Loader2 className="size-10 animate-spin text-slate-400" aria-hidden />
         <p className="text-sm text-slate-400">Loading local database…</p>
       </div>
@@ -20,7 +20,7 @@ export function DbGate({ children }: DbGateProps) {
 
   if (status === 'error') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 px-6 text-center text-slate-200">
+      <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-4 bg-slate-950 px-6 text-center text-slate-200">
         <p className="max-w-md text-sm text-red-300">{errorMessage}</p>
         <button
           type="button"

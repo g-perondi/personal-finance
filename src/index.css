@@ -24,6 +24,38 @@ body {
   cursor: default;
 }
 
+/** Electron frameless window: drag region and window controls (Windows-style). */
+.electron-title-bar {
+  height: 2.5rem;
+  -webkit-app-region: drag;
+}
+
+.electron-title-bar-controls {
+  -webkit-app-region: no-drag;
+}
+
+.electron-title-bar-button {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  color: rgb(203 213 225);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.electron-title-bar-button:hover {
+  background-color: rgb(30 41 59);
+  color: rgb(255 255 255);
+}
+
+.electron-title-bar-button-close:hover {
+  background-color: rgb(185 28 28);
+  color: rgb(255 255 255);
+}
+
 input,
 textarea,
 select,

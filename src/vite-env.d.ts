@@ -16,7 +16,10 @@ interface ElectronDesktopApi {
   dataDirectoryPathExists?: (relativePath: string) => Promise<boolean>
   saveBackupZipAs?: (defaultFileName: string, data: Uint8Array) => Promise<boolean>
   quit?: () => Promise<void>
-  registerQuitPrep?: (handler: () => Promise<void>) => () => void
+  minimizeWindow?: () => Promise<void>
+  toggleMaximizeWindow?: () => Promise<boolean>
+  requestCloseWindow?: () => void
+  onWindowMaximizedChange?: (handler: (maximized: boolean) => void) => () => void
   onRequestClose?: (handler: () => void) => () => void
 }
 

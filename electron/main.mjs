@@ -106,8 +106,6 @@ let closeStaticServer = null
 /** @type {string | null} */
 let dataDirectoryPath = null
 let appQuitting = false
-/** @type {boolean} */
-let closePromptInFlight = false
 
 async function finishAppQuit() {
   appQuitting = true
@@ -128,84 +126,11 @@ async function finishAppQuit() {
   app.exit(0)
 }
 
-/**
- * @param {import('electron').BrowserWindow} win
- * @param {number} [timeoutMs]
- */
-function requestQuitPrepFromRenderer(win, timeoutMs = 20_000) {
-  return new Promise((resolve, reject) => {
-    /** @type {NodeJS.Timeout} */
-    let timeout
-    function cleanup() {
-      clearTimeout(timeout)
-      ipcMain.removeListener('app:quit-prep-done', onDone)
-      ipcMain.removeListener('app:quit-prep-failed', onFailed)
-    }
-    function onDone() {
-      cleanup()
-      resolve(undefined)
-    }
-    /** @param {Electron.IpcMainEvent} _event */
-    function onFailed(_event, message) {
-      cleanup()
-      reject(new Error(typeof message === 'string' ? message : 'Sync failed'))
-    }
-    timeout = setTimeout(() => {
-      cleanup()
-      reject(new Error('Sync timed out.'))
-    }, timeoutMs)
-    ipcMain.once('app:quit-prep-done', onDone)
-    ipcMain.once('app:quit-prep-failed', onFailed)
-    if (win.webContents.isDestroyed()) {
-      cleanup()
-      reject(new Error('Window unavailable.'))
-      return
-    }
-    win.webContents.send('app:quit-prep')
-  })
-}
-
-/**
- * @param {import('electron').BrowserWindow} win
- */
-async function handleMainWindowCloseAttempt(win) {
-  if (appQuitting || win.isDestroyed()) {
+function notifyWindowMaximized(win) {
+  if (win.isDestroyed()) {
     return
   }
-
-  const hasDataDir = Boolean(dataDirectoryPath)
-  const { response } = await dialog.showMessageBox(win, {
-    type: 'question',
-    buttons: ['Cancel', 'Exit'],
-    defaultId: 0,
-    cancelId: 0,
-    message: 'Exit Personal Finance?',
-    detail: hasDataDir
-      ? 'Open data will be synced to your configured folder, then the app will close.'
-      : 'Close the application?',
-  })
-  if (response !== 1) {
-    return
-  }
-
-  try {
-    await requestQuitPrepFromRenderer(win)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Sync failed'
-    const { response: forceResponse } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: ['Cancel', 'Exit without syncing'],
-      defaultId: 0,
-      cancelId: 0,
-      message: 'Could not sync before exit',
-      detail,
-    })
-    if (forceResponse !== 1) {
-      return
-    }
-  }
-
-  await finishAppQuit()
+  win.webContents.send('window:maximized-changed', win.isMaximized())
 }
 
 function resolveDataPath(relativePath) {
@@ -282,6 +207,30 @@ function registerDataDirectoryIpc() {
     await finishAppQuit()
   })
 
+  ipcMain.handle('window:minimize', () => {
+    mainWindow?.minimize()
+  })
+
+  ipcMain.handle('window:toggle-maximize', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return false
+    }
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize()
+    } else {
+      mainWindow.maximize()
+    }
+    notifyWindowMaximized(mainWindow)
+    return mainWindow.isMaximized()
+  })
+
+  ipcMain.on('window:request-close', () => {
+    if (appQuitting || !mainWindow || mainWindow.webContents.isDestroyed()) {
+      return
+    }
+    mainWindow.webContents.send('app:request-close')
+  })
+
   ipcMain.handle('backup:save-as', async (_, defaultFileName, data) => {
     const safeName =
       typeof defaultFileName === 'string' && defaultFileName.trim()
@@ -317,12 +266,25 @@ async function createMainWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Personal Finance',
+    frame: false,
+    backgroundColor: '#020617',
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(currentDir, 'preload.mjs'),
     },
+  })
+
+  mainWindow.on('maximize', () => {
+    if (mainWindow) {
+      notifyWindowMaximized(mainWindow)
+    }
+  })
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow) {
+      notifyWindowMaximized(mainWindow)
+    }
   })
 
   if (isDev) {
@@ -343,22 +305,17 @@ async function createMainWindow() {
       return
     }
     event.preventDefault()
-    if (closePromptInFlight) {
+    if (!mainWindow || mainWindow.webContents.isDestroyed()) {
       return
     }
-    const win = mainWindow
-    if (!win || win.isDestroyed()) {
-      return
-    }
-    closePromptInFlight = true
-    void handleMainWindowCloseAttempt(win).finally(() => {
-      closePromptInFlight = false
-    })
+    mainWindow.webContents.send('app:request-close')
   })
 
   mainWindow.webContents.on('context-menu', (event) => {
     event.preventDefault()
   })
+
+  notifyWindowMaximized(mainWindow)
 }
 
 if (gotSingleInstanceLock) {
