@@ -1,9 +1,10 @@
 import { NavLink, Outlet, useLocation, useNavigate, type To } from 'react-router-dom'
-import { useCallback, useMemo, type MouseEvent } from 'react'
+import { Suspense, useCallback, useMemo, type MouseEvent } from 'react'
 import {
   ArrowLeftRight,
   FolderOpen,
   LayoutDashboard,
+  Loader2,
   Settings,
   Tag,
   TrendingUp,
@@ -118,7 +119,16 @@ export function AppShell() {
           </div>
         </aside>
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-400">
+                <Loader2 className="size-8 animate-spin" aria-hidden />
+                <p className="text-sm">Loading…</p>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </>

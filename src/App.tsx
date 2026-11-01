@@ -1,13 +1,33 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { FeatureEnabledRoute } from './components/FeatureEnabledRoute'
-import { AccountPage } from './pages/AccountPage'
-import { CategoryPage } from './pages/CategoryPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { DocumentPage } from './pages/DocumentPage'
-import { InvestmentPage } from './pages/InvestmentPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { TransactionPage } from './pages/TransactionPage'
+
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })),
+)
+const TransactionPage = lazy(() =>
+  import('./pages/TransactionPage').then((module) => ({
+    default: module.TransactionPage,
+  })),
+)
+const InvestmentPage = lazy(() =>
+  import('./pages/InvestmentPage').then((module) => ({
+    default: module.InvestmentPage,
+  })),
+)
+const AccountPage = lazy(() =>
+  import('./pages/AccountPage').then((module) => ({ default: module.AccountPage })),
+)
+const CategoryPage = lazy(() =>
+  import('./pages/CategoryPage').then((module) => ({ default: module.CategoryPage })),
+)
+const DocumentPage = lazy(() =>
+  import('./pages/DocumentPage').then((module) => ({ default: module.DocumentPage })),
+)
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })),
+)
 
 function App() {
   return (

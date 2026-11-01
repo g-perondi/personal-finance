@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js'
 import {
   deleteDocumentFile,
+  readDocumentFile,
   writeDocumentFile,
 } from '../../lib/data-directory/document-files'
 import { schedulePersist } from '../database'
@@ -328,7 +329,6 @@ export async function readDocumentBlob(
   db: Database,
   documentId: string,
 ): Promise<ArrayBuffer | null> {
-  const { readDocumentFile } = await import('../../lib/data-directory/document-files')
   const result = await readDocumentFile(db, documentId)
   return result.ok ? result.data : null
 }

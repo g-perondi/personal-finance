@@ -8,7 +8,7 @@ import {
 import { clearDocumentBlobStore, replaceSnapshot } from '../db/idb'
 import { getCurrentSchemaVersion, runMigrations } from '../db/migrations'
 import { getDocumentById, listDocuments } from '../db/repositories/document'
-import { writeDocumentFile } from './data-directory/document-files'
+import { readDocumentFile, writeDocumentFile } from './data-directory/document-files'
 import {
   ensureBrowserDirectoryPermission,
   getBrowserDirectoryHandle,
@@ -143,7 +143,6 @@ export async function buildBackupZipBytes(): Promise<BackupBuildResult> {
   zipEntries[SQLITE_PATH] = sqlite
 
   let missingDocumentCount = 0
-  const { readDocumentFile } = await import('./data-directory/document-files')
   for (const doc of docs) {
     const result = await readDocumentFile(db, doc.id)
     if (!result.ok) {

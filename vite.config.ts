@@ -9,6 +9,25 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-recharts',
+              test: /node_modules[\\/]recharts/,
+            },
+            {
+              name: 'vendor-sql-js',
+              test: /sql-wasm-browser|node_modules[\\/]sql\.js/,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,
