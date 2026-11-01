@@ -1,8 +1,10 @@
 const IDB_NAME = 'personal-finance'
-export const IDB_VERSION = 2
+export const IDB_VERSION = 3
 const STORE_NAME = 'database'
 const SNAPSHOT_KEY = 'sqlite'
 export const DOCUMENT_BLOB_STORE = 'document_blob'
+export const FS_DIRECTORY_HANDLE_STORE = 'fs_directory_handle'
+const FS_DIRECTORY_HANDLE_KEY = 'data_directory'
 
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -20,6 +22,9 @@ function openIdb(): Promise<IDBDatabase> {
       }
       if (!idb.objectStoreNames.contains(DOCUMENT_BLOB_STORE)) {
         idb.createObjectStore(DOCUMENT_BLOB_STORE)
+      }
+      if (!idb.objectStoreNames.contains(FS_DIRECTORY_HANDLE_STORE)) {
+        idb.createObjectStore(FS_DIRECTORY_HANDLE_STORE)
       }
     })
   })
@@ -111,6 +116,48 @@ export async function deleteSnapshot(): Promise<void> {
     const tx = idb.transaction(STORE_NAME, 'readwrite')
     const store = tx.objectStore(STORE_NAME)
     store.delete(SNAPSHOT_KEY)
+    await idbTransactionComplete(tx)
+  } finally {
+    idb.close()
+  }
+}
+
+export async function saveDataDirectoryHandle(
+  handle: FileSystemDirectoryHandle,
+): Promise<void> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(FS_DIRECTORY_HANDLE_STORE, 'readwrite')
+    const store = tx.objectStore(FS_DIRECTORY_HANDLE_STORE)
+    store.put(handle, FS_DIRECTORY_HANDLE_KEY)
+    await idbTransactionComplete(tx)
+  } finally {
+    idb.close()
+  }
+}
+
+export async function loadDataDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(FS_DIRECTORY_HANDLE_STORE, 'readonly')
+    const store = tx.objectStore(FS_DIRECTORY_HANDLE_STORE)
+    const value = await idbRequest(store.get(FS_DIRECTORY_HANDLE_KEY))
+    await idbTransactionComplete(tx)
+    if (value && typeof value === 'object' && 'name' in value) {
+      return value as FileSystemDirectoryHandle
+    }
+    return null
+  } finally {
+    idb.close()
+  }
+}
+
+export async function clearDataDirectoryHandle(): Promise<void> {
+  const idb = await openIdb()
+  try {
+    const tx = idb.transaction(FS_DIRECTORY_HANDLE_STORE, 'readwrite')
+    const store = tx.objectStore(FS_DIRECTORY_HANDLE_STORE)
+    store.delete(FS_DIRECTORY_HANDLE_KEY)
     await idbTransactionComplete(tx)
   } finally {
     idb.close()

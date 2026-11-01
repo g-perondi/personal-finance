@@ -11,6 +11,7 @@ import {
   utcNowIso,
 } from '../../lib/datetime'
 import type { TransactionListItem, TransactionRecord } from './model'
+import { reverseHoldingPurchaseForTransaction } from './holding'
 import { TRANSACTION_TABLE } from './sql'
 
 function mapRecurrenceKind(row: Record<string, unknown>): RecurrenceKind | null {
@@ -63,10 +64,28 @@ const LIST_SELECT = `
     t.description,
     t.created_at,
     a.name AS account_name,
-    c.name AS category_name
+    c.name AS category_name,
+    CASE
+      WHEN t.kind = 'transfer' AND t.transfer_leg = 'in' THEN
+        CASE
+          WHEN tr.from_account_deleted_label IS NOT NULL AND TRIM(tr.from_account_deleted_label) != ''
+          THEN tr.from_account_deleted_label || ' (deleted)'
+          ELSE tr_from.name
+        END
+      WHEN t.kind = 'transfer' AND t.transfer_leg = 'out' THEN
+        CASE
+          WHEN tr.to_account_deleted_label IS NOT NULL AND TRIM(tr.to_account_deleted_label) != ''
+          THEN tr.to_account_deleted_label || ' (deleted)'
+          ELSE tr_to.name
+        END
+      ELSE NULL
+    END AS transfer_counterparty_name
   FROM ${TRANSACTION_TABLE} t
   INNER JOIN account a ON a.id = t.account_id
   LEFT JOIN category c ON c.id = t.category_id
+  LEFT JOIN transfer tr ON tr.id = t.transfer_id
+  LEFT JOIN account tr_from ON tr_from.id = tr.from_account_id
+  LEFT JOIN account tr_to ON tr_to.id = tr.to_account_id
 `
 
 export type ListTransactionsOptions = {
@@ -101,7 +120,9 @@ export function listTransactions(
     clauses.push('t.transaction_date < ?')
     params.push(options.endUtcExclusive)
   }
-  appendTransactionSearchClauses(clauses, params, options.searchQuery)
+  appendTransactionSearchClauses(clauses, params, options.searchQuery, {
+    includeTransferDeletedAccountLabels: true,
+  })
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
   const limit = options.limit ?? 200
@@ -117,6 +138,10 @@ export function listTransactions(
       ...mapTransactionRow(row),
       accountName: String(row.account_name),
       categoryName: row.category_name == null ? null : String(row.category_name),
+      transferCounterpartyName:
+        row.transfer_counterparty_name == null
+          ? null
+          : String(row.transfer_counterparty_name),
     })
   }
   stmt.free()
@@ -222,6 +247,9 @@ export function deleteSimpleTransaction(db: Database, id: string): void {
   const existing = getTransactionById(db, id)
   if (!existing || existing.kind === 'transfer') {
     throw new Error('Transaction not found or must be deleted via transfer.')
+  }
+  if (existing.kind === 'investment') {
+    reverseHoldingPurchaseForTransaction(db, id)
   }
   db.run(`DELETE FROM ${TRANSACTION_TABLE} WHERE id = ?`, [id])
   schedulePersist()

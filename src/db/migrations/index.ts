@@ -6,6 +6,11 @@ import accountOpenedAtSql from './004_account_opened_at.sql?raw'
 import documentSql from './005_document.sql?raw'
 import documentTagSql from './006_document_tag.sql?raw'
 import transactionRebalancingSql from './011_transaction_rebalancing.sql?raw'
+import accountIsPrimarySql from './012_account_is_primary.sql?raw'
+import categoryUniqueNameSql from './013_category_unique_name_per_type.sql?raw'
+import instrumentAssetKindSql from './014_instrument_asset_kind.sql?raw'
+import appSettingSql from './015_app_setting.sql?raw'
+import transferDeletedAccountLabelSql from './016_transfer_deleted_account_label.sql?raw'
 import instrumentHoldingSql from './010_instrument_holding.sql?raw'
 import dropFtsSql from './009_drop_fts.sql?raw'
 import { utcNowIso } from '../../lib/datetime'
@@ -20,6 +25,11 @@ const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 9, sql: dropFtsSql },
   { version: 10, sql: instrumentHoldingSql },
   { version: 11, sql: transactionRebalancingSql },
+  { version: 12, sql: accountIsPrimarySql },
+  { version: 13, sql: categoryUniqueNameSql },
+  { version: 14, sql: instrumentAssetKindSql },
+  { version: 15, sql: appSettingSql },
+  { version: 16, sql: transferDeletedAccountLabelSql },
 ]
 
 function tableExists(db: Database, tableName: string): boolean {

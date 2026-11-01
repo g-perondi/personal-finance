@@ -27,6 +27,46 @@ const CATEGORY_SELECT = `
   SELECT id, name, type, default_recurrence_kind, created_at FROM category
 `
 
+const DUPLICATE_CATEGORY_NAME_MESSAGE =
+  'A category with this name already exists for this type.'
+
+function findCategoryByNameForType(
+  db: Database,
+  type: CategoryType,
+  name: string,
+  excludeId?: string,
+): CategoryRecord | null {
+  const trimmed = name.trim()
+  const stmt = db.prepare(
+    excludeId
+      ? `${CATEGORY_SELECT} WHERE type = ? AND name = ? COLLATE NOCASE AND id != ? LIMIT 1`
+      : `${CATEGORY_SELECT} WHERE type = ? AND name = ? COLLATE NOCASE LIMIT 1`,
+  )
+  if (excludeId) {
+    stmt.bind([type, trimmed, excludeId])
+  } else {
+    stmt.bind([type, trimmed])
+  }
+  if (!stmt.step()) {
+    stmt.free()
+    return null
+  }
+  const row = mapCategoryRow(stmt.getAsObject())
+  stmt.free()
+  return row
+}
+
+function assertUniqueCategoryName(
+  db: Database,
+  type: CategoryType,
+  name: string,
+  excludeId?: string,
+): void {
+  if (findCategoryByNameForType(db, type, name, excludeId)) {
+    throw new Error(DUPLICATE_CATEGORY_NAME_MESSAGE)
+  }
+}
+
 export function listCategories(db: Database, type?: CategoryType): CategoryRecord[] {
   const sql = type
     ? `${CATEGORY_SELECT} WHERE type = ? ORDER BY name COLLATE NOCASE ASC`
@@ -65,13 +105,15 @@ export function createCategory(
   db: Database,
   input: CreateCategoryInput,
 ): CategoryRecord {
+  const trimmedName = input.name.trim()
+  assertUniqueCategoryName(db, input.type, trimmedName)
   const id = newId()
   const createdAt = utcNowIso()
   const defaultRecurrenceKind = input.defaultRecurrenceKind ?? null
   db.run(
     `INSERT INTO category (id, name, type, default_recurrence_kind, created_at)
      VALUES (?, ?, ?, ?, ?)`,
-    [id, input.name.trim(), input.type, defaultRecurrenceKind, createdAt],
+    [id, trimmedName, input.type, defaultRecurrenceKind, createdAt],
   )
   schedulePersist()
   return getCategoryById(db, id)!
@@ -91,12 +133,14 @@ export function updateCategory(
   if (!existing) {
     throw new Error('Category not found.')
   }
+  const trimmedName = input.name.trim()
+  assertUniqueCategoryName(db, existing.type, trimmedName, id)
   const defaultRecurrenceKind =
     input.defaultRecurrenceKind === undefined
       ? existing.defaultRecurrenceKind
       : input.defaultRecurrenceKind
   db.run(`UPDATE category SET name = ?, default_recurrence_kind = ? WHERE id = ?`, [
-    input.name.trim(),
+    trimmedName,
     defaultRecurrenceKind,
     id,
   ])

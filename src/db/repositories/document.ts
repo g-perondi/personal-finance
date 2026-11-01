@@ -1,5 +1,8 @@
 import type { Database } from 'sql.js'
-import { deleteDocumentBlob, getDocumentBlob, putDocumentBlob } from '../document-blob'
+import {
+  deleteDocumentFile,
+  writeDocumentFile,
+} from '../../lib/data-directory/document-files'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
 import { appendDocumentSearchClauses } from '../../lib/document-search-query'
@@ -142,6 +145,14 @@ export function listDocumentYears(db: Database): number[] {
   return years
 }
 
+export function countDocuments(db: Database): number {
+  const stmt = db.prepare('SELECT COUNT(*) AS count FROM document')
+  stmt.step()
+  const count = Number(stmt.getAsObject().count)
+  stmt.free()
+  return count
+}
+
 export function listDocuments(
   db: Database,
   options: ListDocumentsOptions,
@@ -247,7 +258,7 @@ export async function createDocument(
 
   try {
     syncDocumentTags(db, id, input.documentTagNames ?? [])
-    await putDocumentBlob(id, input.fileData)
+    await writeDocumentFile(id, storedFileName, input.fileData)
   } catch (error: unknown) {
     db.run(`DELETE FROM document WHERE id = ?`, [id])
     throw error instanceof Error ? error : new Error('Failed to store file.')
@@ -303,17 +314,21 @@ export function updateDocument(
 }
 
 export async function deleteDocument(db: Database, id: string): Promise<void> {
-  if (!getDocumentById(db, id)) {
+  const doc = getDocumentById(db, id)
+  if (!doc) {
     throw new Error('Document not found.')
   }
-  await deleteDocumentBlob(id)
+  await deleteDocumentFile(id, doc.fileName)
   db.run(`DELETE FROM document WHERE id = ?`, [id])
   pruneUnusedDocumentCategories(db)
   schedulePersist()
 }
 
 export async function readDocumentBlob(
+  db: Database,
   documentId: string,
 ): Promise<ArrayBuffer | null> {
-  return getDocumentBlob(documentId)
+  const { readDocumentFile } = await import('../../lib/data-directory/document-files')
+  const result = await readDocumentFile(db, documentId)
+  return result.ok ? result.data : null
 }

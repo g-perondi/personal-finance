@@ -30,7 +30,7 @@ Entities use **singular** table names. Amounts are **integer cents**. Primary ke
 - `schema_migration` — applied migration versions
 - `account` — real-world accounts (e.g. Intesa, Revolut, Trade Republic as one row); `opened_at` = start of opening day in Rome (migration 4); `archived_at` when archived (migration 2)
 - `document_category` / `document` / `document_tag` — administrative files (migrations 5–6); see **Documents** below
-- `category` — user-defined; `type` is `income` or `expense`; optional `default_recurrence_kind` (migration 3)
+- `category` — user-defined; `type` is `income` or `expense`; optional `default_recurrence_kind` (migration 3); **unique name per `type`** (case-insensitive, migration 13)
 - `transfer` — header for money moved between two accounts
 - `"transaction"` — ledger lines on an account (quoted name: `transaction` is a SQL reserved word); `recurrence_kind` on income, expense, and investment rows (migration 3 renames from `expense_kind`)
 
@@ -70,7 +70,7 @@ Helper: `signedAmountCents()` in `types.ts`.
 
 **Average balance (accounts page):** for the current Rome calendar year, mean of end-of-day balances from 1 Jan through today; days before `account.created_at` are excluded (`getAccountAverageDailyBalanceCentsForRomeCalendarYear()` in `repositories/account.ts`).
 
-**Invested (accounts page):** sum of `investment` transaction amounts on that account in the same Rome calendar year window (`getAccountInvestedCentsForRomeCalendarYear()`).
+**Investments (accounts page):** market value of holdings per account from `instrument_quote_cache` (same logic as the Investments page; shows `—` when there are holdings but no cached quotes yet).
 
 ## Transfers
 
@@ -78,6 +78,8 @@ Helper: `signedAmountCents()` in `types.ts`.
 2. Insert **two** `transaction` rows with the same `transfer_id`:
    - `kind = transfer`, `transfer_leg = out`, `account_id = from_account_id`
    - `kind = transfer`, `transfer_leg = in`, `account_id = to_account_id`
+
+When an account is **deleted**, the leg on that account is removed; the other leg stays. Migration **16** stores the removed name on `transfer.from_account_deleted_label` / `to_account_deleted_label` (FK repointed to a hidden placeholder account). Transaction lists show the counterparty as **`Name (deleted)`**.
 
 ## Investments (manual Saveback / PAC / ETF)
 
@@ -100,8 +102,8 @@ Scope uses calendar **Europe/Rome** (`src/lib/dashboard-period.ts`, `src/lib/dat
 
 **Wealth** at instant `T` (non-archived accounts that already exist at `T`, i.e. `opened_at < T`):
 
-- **Total** — sum of account balances at `T` plus **ETF cost basis** from `holding_purchase` rows with `purchase_date < T` (opening seeds and buys)
-- **Investment** — that ETF cost basis plus **`investment`** transactions before `T` that are not linked to a holding purchase (avoids double-counting recorded ETF buys)
+- **Total** — sum of account balances at `T` plus **holdings cost basis** from `holding_purchase` rows with `purchase_date < T` (opening seeds and buys; ETF, stocks, crypto)
+- **Investment** — that holdings cost basis plus **`investment`** transactions before `T` that are not linked to a holding purchase (avoids double-counting recorded buys)
 - **Cash** — total minus investment (liquid / non-deployed portion in this model)
 
 Month-end / daily series use the same rules at each point in time. Historical points use **cost basis**, not market quotes.
@@ -110,21 +112,43 @@ Month-end / daily series use the same rules at each point in time. Historical po
 
 Repository: [`repositories/dashboard.ts`](repositories/dashboard.ts).
 
-## ETF holdings (migration 10)
+## Portfolio holdings (migrations 10 + 14)
 
-Portfolio positions are separate from the cash ledger: **`instrument`** (ISIN, Yahoo/API `quote_symbol`, name), **`holding`** (one row per account + ETF: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; optional `transaction_id` for buys that also post an **`investment`** transaction).
+Portfolio positions are separate from the cash ledger: **`instrument`** (`asset_kind`: `etf` | `equity` | `crypto`, optional ISIN, `quote_symbol`, name), **`holding`** (one row per account + instrument: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; optional `transaction_id` for buys that also post an **`investment`** transaction).
+
+| `asset_kind` | Lookup                     | `quote_symbol`                | Live price (EUR) |
+| ------------ | -------------------------- | ----------------------------- | ---------------- |
+| `etf`        | Yahoo search (ISIN/ticker) | Yahoo symbol (e.g. `SWDA.MI`) | Yahoo chart + FX |
+| `equity`     | Yahoo search (ISIN/ticker) | Yahoo symbol                  | Yahoo chart + FX |
+| `crypto`     | Yahoo search (name/ticker) | Yahoo pair (e.g. `BTC-EUR`)   | Yahoo chart + FX |
+
+Migration **14** adds `instrument.asset_kind` with default **`etf`** for existing rows (backup restore from pre-14 builds upgrades via `runMigrations()`).
 
 - **Weighted average cost:** display avg = `total_cost_cents / quantity`; new buys add amount to cost and units from `amount_cents / price_cents_per_unit`.
 - **Opening seed:** `createOpeningHolding` — `openingDate`, `quantity`, and average **`priceCentsPerUnit`** (cost basis = round(qty × price)); optional **`recordInvestmentTransaction`** (default off in API; UI defaults on) posts a matching **`investment`** row and links `holding_purchase.transaction_id`.
 - **New purchase:** `recordHoldingPurchase` — updates holding, inserts purchase, inserts matching **`transaction`** (`kind = investment`) on the same account/date/amount.
-- **Quotes:** [`src/lib/market-quotes/`](../lib/market-quotes/) fetches delayed/unofficial prices in the browser (CORS providers + SQLite **`instrument_quote_cache`**). Live fetch runs only when opening **`/investments`** or clicking **Refresh quotes**; the dashboard **Portfolio value** KPI uses cached prices from the last fetch.
+- **Delete investment transaction:** `deleteSimpleTransaction` on a linked row runs `reverseHoldingPurchaseForTransaction` first (removes the purchase line and reduces or deletes the holding). Unlinked manual **`investment`** rows only remove the ledger line.
+- **Recent purchases (Investments UI):** `updateHoldingPurchase` / `deleteHoldingPurchase` keep `holding`, `holding_purchase`, and linked **`investment`** transactions in sync (delete removes the ledger row when `transaction_id` is set).
+- **Quotes:** [`src/lib/market-quotes/`](../lib/market-quotes/) fetches delayed/unofficial prices in the browser (Yahoo Finance via CORS proxy + SQLite **`instrument_quote_cache`**). All asset kinds use the same Yahoo chart path with conversion to EUR when needed.
 - **Wealth chart** uses the rules above (holdings cost basis over time; not live quote marks).
 
 Repositories: [`repositories/instrument.ts`](repositories/instrument.ts), [`repositories/holding.ts`](repositories/holding.ts).
 
+## App settings (migration 15)
+
+Table **`app_setting`** (`key`, `value`, `updated_at`) stores UI preferences: date/number formats, IANA time zone, feature toggles (investments/documents), and data folder display path. Loaded via [`repositories/app_setting.ts`](repositories/app_setting.ts) and [`AppSettingsProvider`](../../context/AppSettingsProvider.tsx). Legacy `display_currency` keys from older builds are ignored.
+
+## Data folder sync
+
+When configured (Settings or Documents gate), the app treats a user-chosen folder as the home for **`sqlite.db`**, **`documents/{id}/{file_name}`**, **`manifest.json`**, **`settings.json`**, and **`backups/*.zip`**. Runtime CRUD still uses sql.js + IndexedDB; the folder is synced **on startup** (import DB snapshot) and **on exit / Sync now** (export). Browser: File System Access handle in IndexedDB (`fs_directory_handle`, IDB v3). Desktop: Electron IPC file ops in [`electron/main.mjs`](../../../electron/main.mjs).
+
+Implementation: [`src/lib/data-directory/`](../lib/data-directory/).
+
 ## Documents
 
-Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction); file bytes in IndexedDB store **`document_blob`** (key = `document.id`). See [`document-blob.ts`](../document-blob.ts) and [`repositories/document.ts`](repositories/document.ts).
+Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction); **file bytes on disk** under `{dataDirectory}/documents/{documentId}/{file_name}` — not in IndexedDB. See [`document-files.ts`](../lib/data-directory/document-files.ts) and [`repositories/document.ts`](repositories/document.ts).
+
+Legacy **`document_blob`** IndexedDB entries are migrated into the data folder on sync when present.
 
 - **`document_tag`**: many-to-many between `document` and `document_category` (migration 6); replaces `document.document_category_id`.
 - **`reference_year`** (required): calendar year for filtering in the UI; distinct years come from `listDocumentYears()`.
@@ -133,7 +157,7 @@ Metadata in SQLite (`document`, `document_category`, **`document_tag`** junction
 - **Full-text search:** case-insensitive **LIKE** on `title`, `note`, `file_name`, and tag names (`appendDocumentSearchClauses` in [`document-search-query.ts`](../lib/document-search-query.ts)). No FTS5 — the bundled sql.js WASM does not include that module.
 - **`document_category`**: tag labels; a row exists only while at least one document links it via **`document_tag`**. Assign names on each document (add/edit modal); new names are persisted on save. Removing a tag from every document (or deleting those documents) drops the unused category row (`pruneUnusedDocumentCategories`).
 - Allowed MIME types: PDF, JPEG, PNG, WebP; max **15 MB** per file (`src/lib/document-upload.ts`).
-- Create order: insert `document` row → put blob → persist SQLite snapshot. Delete: remove blob then row.
+- Create order: insert `document` row → write file under data folder → persist SQLite snapshot. Delete: remove file then row.
 - **`file_name`**: stored as `{base}_{yyyyMMdd_HHmmss}{ext}` (UTC), derived from the uploaded name at create time (`buildStoredDocumentFileName` in `document-upload.ts`).
 - UI preview: blob object URLs in [`DocumentViewerModal`](../../components/documents/DocumentViewerModal.tsx) (PDF in `<iframe>`, images in `<img>`); revoked on close.
 
@@ -149,15 +173,15 @@ Case-insensitive **LIKE** on **description**, **account name**, and **category n
 
 Full export is a **ZIP** (`formatVersion` 1) built in [`src/lib/backup.ts`](../lib/backup.ts):
 
-| Entry                | Content                                                             |
-| -------------------- | ------------------------------------------------------------------- |
-| `manifest.json`      | `formatVersion`, `exportedAt` (UTC ISO), `schemaVersion`, `blobIds` |
-| `sqlite.db`          | sql.js snapshot (same bytes as IndexedDB key `sqlite`)              |
-| `blobs/{documentId}` | Raw file bytes from IndexedDB store `document_blob`                 |
+| Entry                | Content                                                                        |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `manifest.json`      | `formatVersion`, `exportedAt` (UTC ISO), `schemaVersion`, `blobIds`            |
+| `sqlite.db`          | sql.js snapshot (same bytes as IndexedDB key `sqlite`)                         |
+| `blobs/{documentId}` | Raw file bytes from **`documents/`** on the data folder (ZIP layout unchanged) |
 
-**Export:** flushes the in-memory DB to IndexedDB (`flushPersist()`), then zips snapshot + all blob keys. Max **100 MB** per archive.
+**Export:** flushes the in-memory DB, reads document files from the data folder when configured, then zips. The app opens a **Save** dialog (browser: File System Access save picker; desktop: native save dialog). The default folder is **`backups/`** under your configured data directory when one is set. Max **100 MB** per archive.
 
-**Restore:** replaces the SQLite snapshot and **clears** then repopulates `document_blob`; validates manifest, opens `sqlite.db` in a throwaway database to ensure every `document.id` has a matching blob entry, then **`window.location.reload()`** so the app singleton reopens cleanly.
+**Restore:** replaces the SQLite snapshot, writes blobs into **`documents/`** when a data folder is available, validates manifest, then **`window.location.reload()`**.
 
 UI: sidebar footer **Download backup** / **Restore backup** / **Clear all data** (English). Restore and clear are destructive — confirm in a modal before proceeding.
 

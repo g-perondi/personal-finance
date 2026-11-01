@@ -46,14 +46,24 @@ export function appendTransactionSearchClauses(
   clauses: string[],
   params: (string | number)[],
   searchQuery: string | null | undefined,
+  options?: { includeTransferDeletedAccountLabels?: boolean },
 ): void {
   for (const token of tokenizeSearchQuery(searchQuery ?? '')) {
     const pattern = likePatternForToken(token)
-    clauses.push(`(
-      COALESCE(t.description, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE OR
-      a.name LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE OR
-      COALESCE(c.name, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE
-    )`)
-    params.push(pattern, pattern, pattern)
+    const parts = [
+      `COALESCE(t.description, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE`,
+      `a.name LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE`,
+      `COALESCE(c.name, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE`,
+    ]
+    const tokenParams: string[] = [pattern, pattern, pattern]
+    if (options?.includeTransferDeletedAccountLabels) {
+      parts.push(
+        `COALESCE(tr.from_account_deleted_label, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE`,
+        `COALESCE(tr.to_account_deleted_label, '') LIKE ? ESCAPE '${LIKE_ESCAPE}' COLLATE NOCASE`,
+      )
+      tokenParams.push(pattern, pattern)
+    }
+    clauses.push(`(${parts.join(' OR ')})`)
+    params.push(...tokenParams)
   }
 }

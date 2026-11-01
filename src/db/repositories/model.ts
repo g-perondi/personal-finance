@@ -18,14 +18,16 @@ export type AccountRecord = {
   createdAt: UtcIsoString
   /** UTC ISO 8601 when archived */
   archivedAt: UtcIsoString | null
+  /** Default account for new entries and first in pickers when true. */
+  isPrimary: boolean
 }
 
 export type AccountWithBalance = AccountRecord & {
   balanceCents: number
   /** Mean end-of-day balance for elapsed days in the Rome calendar year (accounts list only). */
   averageDailyBalanceYtdCents?: number
-  /** Sum of investment movements in the Rome calendar year (accounts list only). */
-  investedYtdCents?: number
+  /** Market value of holdings from quote cache (accounts list only); `null` if quotes missing. */
+  holdingsMarketValueCents?: number | null
 }
 
 export type CategoryRecord = {
@@ -57,6 +59,8 @@ export type TransactionRecord = {
 export type TransactionListItem = TransactionRecord & {
   accountName: string
   categoryName: string | null
+  /** Counterparty account for transfers (includes " (deleted)" when the other leg was removed). */
+  transferCounterpartyName: string | null
 }
 
 export type DocumentCategoryRecord = {
@@ -86,11 +90,15 @@ export type DocumentListItem = DocumentRecord & {
   tags: DocumentTagSummary[]
 }
 
+export const INSTRUMENT_ASSET_KINDS = ['etf', 'equity', 'crypto'] as const
+export type InstrumentAssetKind = (typeof INSTRUMENT_ASSET_KINDS)[number]
+
 export type InstrumentRecord = {
   id: string
   isin: string | null
   quoteSymbol: string
   name: string
+  assetKind: InstrumentAssetKind
   createdAt: UtcIsoString
 }
 
@@ -106,6 +114,7 @@ export type HoldingRecord = {
 export type HoldingListItem = HoldingRecord & {
   instrumentName: string
   instrumentIsin: string | null
+  instrumentAssetKind: InstrumentAssetKind
   quoteSymbol: string
   accountName: string
 }
@@ -122,6 +131,10 @@ export type HoldingPurchaseRecord = {
 }
 
 export type HoldingPurchaseListItem = HoldingPurchaseRecord & {
+  accountId: string
   instrumentName: string
+  instrumentIsin: string | null
+  quoteSymbol: string
+  instrumentAssetKind: InstrumentAssetKind
   accountName: string
 }

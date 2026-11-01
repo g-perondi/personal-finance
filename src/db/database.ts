@@ -126,6 +126,17 @@ export function getDatabase(): Database {
   return dbInstance
 }
 
+/** Replace the in-memory database from a snapshot (e.g. data folder sync). */
+export async function reloadDatabaseFromSnapshot(data: Uint8Array): Promise<void> {
+  const SQL = await loadSqlJsModule()
+  if (dbInstance) {
+    dbInstance.close()
+    dbInstance = null
+  }
+  dbInstance = openDatabase(SQL, data.slice())
+  await saveSnapshot(data.slice())
+}
+
 export async function resetDatabaseForRetry(): Promise<void> {
   if (persistTimer !== null) {
     clearTimeout(persistTimer)

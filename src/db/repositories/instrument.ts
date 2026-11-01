@@ -2,7 +2,15 @@ import type { Database } from 'sql.js'
 import { schedulePersist } from '../database'
 import { newId } from '../../lib/id'
 import { toUtcIsoString, utcNowIso } from '../../lib/datetime'
-import type { InstrumentRecord } from './model'
+import type { InstrumentAssetKind, InstrumentRecord } from './model'
+
+function parseAssetKind(raw: unknown): InstrumentAssetKind {
+  const value = String(raw)
+  if (value === 'equity' || value === 'crypto') {
+    return value
+  }
+  return 'etf'
+}
 
 function mapInstrumentRow(row: Record<string, unknown>): InstrumentRecord {
   return {
@@ -10,6 +18,7 @@ function mapInstrumentRow(row: Record<string, unknown>): InstrumentRecord {
     isin: row.isin == null ? null : String(row.isin),
     quoteSymbol: String(row.quote_symbol),
     name: String(row.name),
+    assetKind: parseAssetKind(row.asset_kind ?? 'etf'),
     createdAt: toUtcIsoString(String(row.created_at)),
   }
 }
@@ -45,6 +54,7 @@ export type UpsertInstrumentInput = {
   isin: string | null
   quoteSymbol: string
   name: string
+  assetKind: InstrumentAssetKind
 }
 
 export function upsertInstrument(
@@ -52,14 +62,14 @@ export function upsertInstrument(
   input: UpsertInstrumentInput,
 ): InstrumentRecord {
   const isin = input.isin?.trim().toUpperCase() || null
+  const assetKind = input.assetKind
   if (isin) {
     const existing = findInstrumentByIsin(db, isin)
     if (existing) {
-      db.run(`UPDATE instrument SET quote_symbol = ?, name = ? WHERE id = ?`, [
-        input.quoteSymbol.trim(),
-        input.name.trim(),
-        existing.id,
-      ])
+      db.run(
+        `UPDATE instrument SET quote_symbol = ?, name = ?, asset_kind = ? WHERE id = ?`,
+        [input.quoteSymbol.trim(), input.name.trim(), assetKind, existing.id],
+      )
       schedulePersist()
       return getInstrumentById(db, existing.id)!
     }
@@ -73,8 +83,15 @@ export function upsertInstrument(
     const existing = mapInstrumentRow(bySymbol.getAsObject())
     bySymbol.free()
     if (isin && !existing.isin) {
-      db.run(`UPDATE instrument SET isin = ?, name = ? WHERE id = ?`, [
+      db.run(`UPDATE instrument SET isin = ?, name = ?, asset_kind = ? WHERE id = ?`, [
         isin,
+        input.name.trim(),
+        assetKind,
+        existing.id,
+      ])
+    } else if (existing.assetKind !== assetKind) {
+      db.run(`UPDATE instrument SET asset_kind = ?, name = ? WHERE id = ?`, [
+        assetKind,
         input.name.trim(),
         existing.id,
       ])
@@ -87,9 +104,9 @@ export function upsertInstrument(
   const id = newId()
   const createdAt = utcNowIso()
   db.run(
-    `INSERT INTO instrument (id, isin, quote_symbol, name, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, isin, input.quoteSymbol.trim(), input.name.trim(), createdAt],
+    `INSERT INTO instrument (id, isin, quote_symbol, name, asset_kind, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, isin, input.quoteSymbol.trim(), input.name.trim(), assetKind, createdAt],
   )
   schedulePersist()
   return getInstrumentById(db, id)!
