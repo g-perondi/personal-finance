@@ -82,7 +82,7 @@ export function CashflowChartWidget({
               <Legend wrapperStyle={dashboardChartLegendWrapperStyle} />
               <Bar dataKey="Income" fill={amountChartColor.inflow} />
               <Bar dataKey="Expenses" fill={amountChartColor.outflow} />
-              <Bar dataKey="Investments" fill={amountChartColor.transfer} />
+              <Bar dataKey="Investments" fill={amountChartColor.investment} />
             </BarChart>
           </ResponsiveContainer>
         </div>

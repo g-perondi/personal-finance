@@ -1,8 +1,11 @@
-/** Tailwind text classes for signed transaction amounts (income / expense / transfer). */
+/** Tailwind text classes for signed transaction amounts and dashboard tones. */
 export const amountColorClass = {
   inflow: 'text-emerald-400',
   outflow: 'text-red-400',
   transfer: 'text-sky-400',
+  investment: 'text-violet-400',
+  savings: 'text-teal-400',
+  wealth: 'text-yellow-400',
 } as const
 
 export type AmountColorTone = keyof typeof amountColorClass
@@ -12,6 +15,9 @@ export const amountChartColor: Record<AmountColorTone, string> = {
   inflow: '#34d399',
   outflow: '#f87171',
   transfer: '#38bdf8',
+  investment: '#a78bfa',
+  savings: '#2dd4bf',
+  wealth: '#facc15',
 }
 
 /** Wealth line chart (Total / Cash / Investment). */

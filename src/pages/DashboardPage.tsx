@@ -1,3 +1,12 @@
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Landmark,
+  LineChart,
+  PiggyBank,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { CashflowChartWidget } from '../components/dashboard/CashflowChartWidget'
 import { DashboardPeriodToolbar } from '../components/dashboard/DashboardPeriodToolbar'
@@ -38,14 +47,6 @@ import { formatCents } from '../lib/money'
 import { amountColorClass, signedAmountColorClass } from '../lib/amount-colors'
 import { useDatabase } from '../hooks/useDatabase'
 import { usePortfolioQuotes } from '../hooks/usePortfolioQuotes'
-
-/** Cashflow (and any extra charts) wrap from row 2; row 1 is Wealth + Last movements. */
-function dashboardBelowRowGridClass(index: number): string {
-  const row = 2 + Math.floor(index / 2)
-  const col = (index % 2) + 1
-  const colClass = col === 1 ? 'lg:col-start-1' : 'lg:col-start-2'
-  return `min-w-0 ${colClass} lg:row-start-[${row}]`
-}
 
 export function DashboardPage() {
   const db = useDatabase()
@@ -181,44 +182,59 @@ export function DashboardPage() {
   const kpiItems = [
     {
       label: 'Total balance',
+      icon: Landmark,
       value: formatCents(data.balanceAtPeriodEnd),
-      valueClassName: 'text-yellow-400',
+      valueClassName: amountColorClass.wealth,
+      iconClassName: amountColorClass.wealth,
     },
     ...(portfolio.holdings.length > 0
       ? [
           {
             label: 'Portfolio value',
+            icon: LineChart,
             value:
               portfolio.totals.marketValueCents === null
                 ? '—'
                 : formatCents(portfolio.totals.marketValueCents),
             valueClassName: amountColorClass.transfer,
+            iconClassName: amountColorClass.transfer,
           },
         ]
       : []),
     {
       label: 'Income',
+      icon: ArrowDownLeft,
       value: formatCents(data.totals.incomeCents),
       valueClassName: amountColorClass.inflow,
+      iconClassName: amountColorClass.inflow,
     },
     {
       label: 'Expenses',
+      icon: ArrowUpRight,
       value: formatCents(data.totals.expenseCents),
       valueClassName: amountColorClass.outflow,
+      iconClassName: amountColorClass.outflow,
     },
     {
       label: 'Investments',
+      icon: TrendingUp,
       value: formatCents(data.totals.investmentCents),
-      valueClassName: amountColorClass.outflow,
+      valueClassName: amountColorClass.investment,
+      iconClassName: amountColorClass.investment,
     },
     {
       label: 'Net balance',
+      icon: Wallet,
       value: formatCents(netBalanceCents),
       valueClassName: signedAmountColorClass(netBalanceCents),
+      iconClassName: signedAmountColorClass(netBalanceCents),
     },
     {
       label: 'Savings rate',
+      icon: PiggyBank,
       value: formatSavingsRate(data.rate),
+      valueClassName: amountColorClass.savings,
+      iconClassName: amountColorClass.savings,
       hint: deltaLabel,
     },
   ]
@@ -248,19 +264,19 @@ export function DashboardPage() {
 
       <KpiWidget items={kpiItems} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {wealthPanel}
 
         <LedgerTableWidget
-          className="dashboard-row1-panel-h min-w-0 lg:col-start-2 lg:row-start-1"
+          className="h-full min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
           title="Last movements"
           rows={data.recentMovements}
           totalCount={data.movementCount}
           viewAllHref="/transactions"
         />
 
-        {belowRowPanels.map((panel, index) => (
-          <div key={panel.key} className={dashboardBelowRowGridClass(index)}>
+        {belowRowPanels.map((panel) => (
+          <div key={panel.key} className="min-w-0 lg:col-start-1 lg:row-start-2">
             {panel}
           </div>
         ))}
