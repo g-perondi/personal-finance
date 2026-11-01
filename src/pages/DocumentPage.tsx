@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { DocumentTagPicker } from '../components/documents/DocumentTagPicker'
 import { DocumentViewerModal } from '../components/documents/DocumentViewerModal'
-import { Modal } from '../components/ui/Modal'
+import { Modal, ModalActions } from '../components/ui/Modal'
 import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import type { DocumentListItem } from '../db/repositories/model'
 import { listDocumentCategories } from '../db/repositories/document_category'
@@ -654,13 +654,11 @@ export function DocumentPage() {
           {documentError ? (
             <p className="text-sm text-red-400">{documentError}</p>
           ) : null}
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <ModalActions
+            onCancel={() => setDocumentModalOpen(false)}
+            submitDisabled={saving}
+            submitLabel={saving ? 'Saving…' : 'Save'}
+          />
         </form>
       </Modal>
 

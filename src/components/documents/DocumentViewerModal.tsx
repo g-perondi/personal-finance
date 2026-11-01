@@ -1,5 +1,5 @@
 import { DocumentImageViewer } from './DocumentImageViewer'
-import { Modal } from '../ui/Modal'
+import { Modal, ModalCancelOnly } from '../ui/Modal'
 import type { DocumentListItem } from '../../db/repositories/model'
 import { isDocumentImage, isDocumentPdf } from '../../lib/document-upload'
 
@@ -65,6 +65,9 @@ export function DocumentViewerModal({
             </p>
           )
         ) : null}
+        <div className="mt-4 shrink-0">
+          <ModalCancelOnly onCancel={onClose} />
+        </div>
       </div>
     </Modal>
   )

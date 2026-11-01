@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Archive, Pencil, Plus, Scale } from 'lucide-react'
-import { Modal } from '../components/ui/Modal'
+import { Modal, ModalActions } from '../components/ui/Modal'
 import { RomeCalendarDateInput } from '../components/ui/RomeCalendarDateInput'
 import {
   archiveAccount,
@@ -320,12 +320,7 @@ export function AccountPage() {
             />
           </label>
           {formError ? <p className="text-sm text-red-400">{formError}</p> : null}
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white"
-          >
-            Save
-          </button>
+          <ModalActions onCancel={() => setModalOpen(false)} />
         </form>
       </Modal>
 
@@ -388,12 +383,10 @@ export function AccountPage() {
             {reconcileError ? (
               <p className="text-sm text-red-400">{reconcileError}</p>
             ) : null}
-            <button
-              type="submit"
-              className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white"
-            >
-              Reconcile
-            </button>
+            <ModalActions
+              onCancel={() => setReconcileOpen(false)}
+              submitLabel="Reconcile"
+            />
           </form>
         ) : null}
       </Modal>

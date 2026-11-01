@@ -167,10 +167,10 @@ export function SidebarBackupSection() {
             {restoreError}
           </p>
         ) : null}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex justify-center gap-3">
           <button
             type="button"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50"
             disabled={restoring}
             onClick={closeRestoreModal}
           >
@@ -216,10 +216,10 @@ export function SidebarBackupSection() {
             {clearError}
           </p>
         ) : null}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex justify-center gap-3">
           <button
             type="button"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50"
             disabled={clearing}
             onClick={closeClearModal}
           >

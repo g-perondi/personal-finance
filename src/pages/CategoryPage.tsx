@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { Modal } from '../components/ui/Modal'
+import { FormSelect } from '../components/ui/FormSelect'
+import { Modal, ModalActions } from '../components/ui/Modal'
 import { recurrenceKindLabel } from '../db/recurrence'
 import type { CategoryType, RecurrenceKind } from '../db/types'
 import {
@@ -184,37 +185,30 @@ export function CategoryPage() {
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Type</span>
-            <select
+            <FormSelect
               value={type}
               disabled={editing !== null}
-              onChange={(event) => setType(event.target.value as CategoryType)}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white disabled:opacity-50"
-            >
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-            </select>
+              onChange={(next) => setType(next as CategoryType)}
+              options={[
+                { value: 'expense', label: 'Expense' },
+                { value: 'income', label: 'Income' },
+              ]}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-300">Default recurrence (optional)</span>
-            <select
+            <FormSelect
               value={defaultRecurrenceKind}
-              onChange={(event) =>
-                setDefaultRecurrenceKind(event.target.value as RecurrenceKind | '')
-              }
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-            >
-              <option value="">None</option>
-              <option value="recurring">Recurring</option>
-              <option value="variable">Variable</option>
-            </select>
+              onChange={(next) => setDefaultRecurrenceKind(next as RecurrenceKind | '')}
+              options={[
+                { value: '', label: 'None' },
+                { value: 'recurring', label: 'Recurring' },
+                { value: 'variable', label: 'Variable' },
+              ]}
+            />
           </label>
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-900 hover:bg-white"
-          >
-            Save
-          </button>
+          <ModalActions onCancel={() => setModalOpen(false)} />
         </form>
       </Modal>
     </div>
