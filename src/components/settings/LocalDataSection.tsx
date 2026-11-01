@@ -6,10 +6,18 @@ import { exportBackupZip, importBackupZip } from '../../lib/backup'
 
 const CLEAR_DATA_CONFIRM_PHRASE = 'clear all data'
 
-export function SidebarBackupSection() {
+const BTN_SECONDARY =
+  'inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-900/50 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50'
+
+const BTN_DANGER =
+  'inline-flex items-center gap-2 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:border-red-800 hover:bg-red-950/70 disabled:cursor-not-allowed disabled:opacity-50'
+
+export function LocalDataSection() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [backupMissingOpen, setBackupMissingOpen] = useState(false)
+  const [backupMissingCount, setBackupMissingCount] = useState(0)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -23,7 +31,14 @@ export function SidebarBackupSection() {
     setExportError(null)
     setExporting(true)
     try {
-      await exportBackupZip()
+      const { missingDocumentCount, cancelled } = await exportBackupZip()
+      if (cancelled) {
+        return
+      }
+      if (missingDocumentCount > 0) {
+        setBackupMissingCount(missingDocumentCount)
+        setBackupMissingOpen(true)
+      }
     } catch (error: unknown) {
       setExportError(
         error instanceof Error ? error.message : 'Unable to create backup.',
@@ -96,62 +111,54 @@ export function SidebarBackupSection() {
     setClearConfirmText('')
   }
 
-  const actionClass =
-    'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
-
   return (
     <>
-      <div className="mt-auto border-t border-slate-800 pt-4">
-        <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-slate-500 uppercase">
-          Local data
-        </p>
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            className={actionClass}
-            disabled={exporting}
-            onClick={() => void handleExport()}
-          >
-            <Download className="size-3.5 shrink-0" aria-hidden />
-            {exporting ? 'Creating backup…' : 'Download backup'}
-          </button>
-          <button
-            type="button"
-            className={actionClass}
-            disabled={restoring}
-            onClick={handleRestoreClick}
-          >
-            <Upload className="size-3.5 shrink-0" aria-hidden />
-            Restore backup
-          </button>
-          <button
-            type="button"
-            className={`${actionClass} text-red-400/90 hover:text-red-300`}
-            disabled={clearing || exporting || restoring}
-            onClick={() => {
-              setClearError(null)
-              setClearConfirmText('')
-              setClearOpen(true)
-            }}
-          >
-            <Trash2 className="size-3.5 shrink-0" aria-hidden />
-            Clear all data
-          </button>
-        </div>
-        {exportError ? (
-          <p className="mt-2 px-3 text-xs text-red-400" role="alert">
-            {exportError}
-          </p>
-        ) : null}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip,application/zip"
-          className="hidden"
-          aria-hidden
-          onChange={handleFileChange}
-        />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={BTN_SECONDARY}
+          disabled={exporting}
+          onClick={() => void handleExport()}
+        >
+          <Download className="size-4 shrink-0" aria-hidden />
+          {exporting ? 'Creating backup…' : 'Download backup'}
+        </button>
+        <button
+          type="button"
+          className={BTN_SECONDARY}
+          disabled={restoring}
+          onClick={handleRestoreClick}
+        >
+          <Upload className="size-4 shrink-0" aria-hidden />
+          Restore backup
+        </button>
+        <button
+          type="button"
+          className={BTN_DANGER}
+          disabled={clearing || exporting || restoring}
+          onClick={() => {
+            setClearError(null)
+            setClearConfirmText('')
+            setClearOpen(true)
+          }}
+        >
+          <Trash2 className="size-4 shrink-0" aria-hidden />
+          Clear all data
+        </button>
       </div>
+      {exportError ? (
+        <p className="text-sm text-red-400" role="alert">
+          {exportError}
+        </p>
+      ) : null}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".zip,application/zip"
+        className="hidden"
+        aria-hidden
+        onChange={handleFileChange}
+      />
 
       <Modal title="Restore backup?" open={restoreOpen} onClose={closeRestoreModal}>
         <p className="text-sm text-slate-300">
@@ -232,6 +239,26 @@ export function SidebarBackupSection() {
             onClick={() => void confirmClear()}
           >
             {clearing ? 'Clearing…' : 'Delete everything'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        title="Backup created"
+        open={backupMissingOpen}
+        onClose={() => setBackupMissingOpen(false)}
+      >
+        <p className="text-sm text-slate-300">
+          Backup created but {backupMissingCount} document file
+          {backupMissingCount === 1 ? ' was' : 's were'} missing from the data folder.
+        </p>
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            onClick={() => setBackupMissingOpen(false)}
+          >
+            Close
           </button>
         </div>
       </Modal>

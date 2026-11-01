@@ -1,8 +1,26 @@
 import { TZDateMini } from '@date-fns/tz'
 import { format } from 'date-fns'
+import { getDateDisplayPattern } from './locale-format'
 
-/** Fixed display zone for all UI formatting (no user picker). */
-export const DISPLAY_TIME_ZONE = 'Europe/Rome'
+let displayTimeZone = 'Europe/Rome'
+
+/** Configurable display zone (default Europe/Rome). */
+export function getDisplayTimeZone(): string {
+  return displayTimeZone
+}
+
+export function setDisplayTimeZone(timeZone: string): void {
+  const trimmed = timeZone.trim()
+  if (!trimmed) {
+    throw new Error('Time zone is required.')
+  }
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: trimmed })
+  } catch {
+    throw new Error(`Invalid time zone: ${trimmed}`)
+  }
+  displayTimeZone = trimmed
+}
 
 /** UTC ISO 8601 instant, e.g. `2025-10-31T12:34:56.789Z`. */
 export type UtcIsoString = string
@@ -38,7 +56,7 @@ export function romeCalendarDateToUtcIso(calendarDate: string): UtcIsoString {
     0,
     0,
     0,
-    DISPLAY_TIME_ZONE,
+    getDisplayTimeZone(),
   )
   return romeMidnight.toISOString()
 }
@@ -66,14 +84,14 @@ export function normalizeStoredCalendarUtc(value: string): UtcIsoString {
 /** Value for `<input type="date">` (calendar day in Europe/Rome). */
 export function utcIsoToRomeDateInputValue(utcIso: string): string {
   const instant = normalizeStoredCalendarUtc(utcIso)
-  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(new Date(instant), getDisplayTimeZone())
   return format(inRome, 'yyyy-MM-dd')
 }
 
 /** Value for `<input type="month">` (calendar month in Europe/Rome). */
 export function utcIsoToRomeMonthInputValue(utcIso: string): string {
   const instant = normalizeStoredCalendarUtc(utcIso)
-  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(new Date(instant), getDisplayTimeZone())
   return format(inRome, 'yyyy-MM')
 }
 
@@ -85,8 +103,8 @@ export function parseRomeYearMonthForStorage(yearMonth: string): UtcIsoString {
 /** Italian calendar day label (`dd/MM/yyyy`, Europe/Rome). */
 export function formatItalianCalendarDateInRome(utcIso: string): string {
   const instant = normalizeStoredCalendarUtc(utcIso)
-  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
-  return format(inRome, 'dd/MM/yyyy')
+  const inRome = new TZDateMini(new Date(instant), getDisplayTimeZone())
+  return format(inRome, getDateDisplayPattern())
 }
 
 const ITALIAN_DATE_INPUT_RE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/
@@ -97,8 +115,8 @@ export function formatRomeCalendarDateInputItalian(calendarDate: string): string
   if (!CALENDAR_DATE_RE.test(trimmed)) {
     return ''
   }
-  const [y, m, d] = trimmed.split('-')
-  return `${d}/${m}/${y}`
+  const instant = romeCalendarDateToUtcIso(trimmed)
+  return formatCalendarDateInRome(instant)
 }
 
 /** Italian typed date (`dd/MM/yyyy`, `/`, `-`, or `.`) → Rome `YYYY-MM-DD`, or null if invalid. */
@@ -127,17 +145,17 @@ export function parseItalianCalendarDateInput(raw: string): string | null {
 }
 
 export function todayRomeDateInputValue(): string {
-  const inRome = new TZDateMini(Date.now(), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(Date.now(), getDisplayTimeZone())
   return format(inRome, 'yyyy-MM-dd')
 }
 
 export function currentRomeYearMonth(): string {
-  const inRome = new TZDateMini(Date.now(), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(Date.now(), getDisplayTimeZone())
   return format(inRome, 'yyyy-MM')
 }
 
 export function currentRomeYear(): number {
-  const inRome = new TZDateMini(Date.now(), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(Date.now(), getDisplayTimeZone())
   return inRome.getFullYear()
 }
 
@@ -161,7 +179,7 @@ export function romeMonthUtcBounds(yearMonth: string): {
     0,
     0,
     0,
-    DISPLAY_TIME_ZONE,
+    getDisplayTimeZone(),
   ).toISOString()
   const endUtcExclusive = new TZDateMini(
     monthIndex === 11 ? year + 1 : year,
@@ -171,7 +189,7 @@ export function romeMonthUtcBounds(yearMonth: string): {
     0,
     0,
     0,
-    DISPLAY_TIME_ZONE,
+    getDisplayTimeZone(),
   ).toISOString()
   return { startUtc, endUtcExclusive }
 }
@@ -182,7 +200,7 @@ export function romeDayUtcBounds(calendarDate: string): {
 } {
   const startUtc = romeCalendarDateToUtcIso(calendarDate)
   const [y, m, d] = calendarDate.split('-').map(Number)
-  const next = new TZDateMini(y!, m! - 1, d! + 1, 0, 0, 0, 0, DISPLAY_TIME_ZONE)
+  const next = new TZDateMini(y!, m! - 1, d! + 1, 0, 0, 0, 0, getDisplayTimeZone())
   return { startUtc, endUtcExclusive: next.toISOString() }
 }
 
@@ -191,7 +209,16 @@ export function romeYearUtcBounds(year: number): {
   endUtcExclusive: UtcIsoString
 } {
   return {
-    startUtc: new TZDateMini(year, 0, 1, 0, 0, 0, 0, DISPLAY_TIME_ZONE).toISOString(),
+    startUtc: new TZDateMini(
+      year,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      getDisplayTimeZone(),
+    ).toISOString(),
     endUtcExclusive: new TZDateMini(
       year + 1,
       0,
@@ -200,20 +227,20 @@ export function romeYearUtcBounds(year: number): {
       0,
       0,
       0,
-      DISPLAY_TIME_ZONE,
+      getDisplayTimeZone(),
     ).toISOString(),
   }
 }
 
 export function daysInRomeMonth(year: number, month: number): number {
-  const inRome = new TZDateMini(year, month - 1, 1, DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(year, month - 1, 1, getDisplayTimeZone())
   void inRome
-  return new TZDateMini(year, month, 0, DISPLAY_TIME_ZONE).getDate()
+  return new TZDateMini(year, month, 0, getDisplayTimeZone()).getDate()
 }
 
 export function formatRomeMonthLabel(yearMonth: string): string {
   const { startUtc } = romeMonthUtcBounds(yearMonth)
-  const inRome = new TZDateMini(new Date(startUtc), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(new Date(startUtc), getDisplayTimeZone())
   return format(inRome, 'MMM yyyy')
 }
 
@@ -222,34 +249,34 @@ export function formatRomeDayShortLabel(calendarDate: string): string {
     Number(calendarDate.slice(0, 4)),
     Number(calendarDate.slice(5, 7)) - 1,
     Number(calendarDate.slice(8, 10)),
-    DISPLAY_TIME_ZONE,
+    getDisplayTimeZone(),
   )
   return format(inRome, 'd MMM')
 }
 
 export function addMonthsToYearMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split('-').map(Number)
-  const d = new TZDateMini(y!, m! - 1 + delta, 1, DISPLAY_TIME_ZONE)
+  const d = new TZDateMini(y!, m! - 1 + delta, 1, getDisplayTimeZone())
   return format(d, 'yyyy-MM')
 }
 
 /** Add calendar days in Europe/Rome (`YYYY-MM-DD`). */
 export function addDaysToRomeCalendarDate(calendarDate: string, days: number): string {
   const [y, m, d] = calendarDate.split('-').map(Number)
-  const next = new TZDateMini(y!, m! - 1, d! + days, 0, 0, 0, 0, DISPLAY_TIME_ZONE)
+  const next = new TZDateMini(y!, m! - 1, d! + days, 0, 0, 0, 0, getDisplayTimeZone())
   return format(next, 'yyyy-MM-dd')
 }
 
 /** English UI label for a stored calendar instant. */
 export function formatCalendarDateInRome(utcIso: string): string {
   const instant = normalizeStoredCalendarUtc(utcIso)
-  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
-  return format(inRome, 'd MMM yyyy')
+  const inRome = new TZDateMini(new Date(instant), getDisplayTimeZone())
+  return format(inRome, getDateDisplayPattern())
 }
 
 /** English UI label for an audit timestamp (`created_at`, `archived_at`, …). */
 export function formatDateTimeInRome(utcIso: string): string {
   const instant = toUtcIsoString(utcIso)
-  const inRome = new TZDateMini(new Date(instant), DISPLAY_TIME_ZONE)
+  const inRome = new TZDateMini(new Date(instant), getDisplayTimeZone())
   return format(inRome, 'd MMM yyyy, HH:mm')
 }

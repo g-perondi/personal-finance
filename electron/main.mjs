@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, stat, writeFile, mkdir, rm, access } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, Menu } from 'electron'
+import { ipcMain, app, BrowserWindow, Menu, dialog } from 'electron'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -101,6 +101,108 @@ function startStaticServer(rootDir, port = PROD_STATIC_PORT) {
 let mainWindow = null
 /** @type {(() => Promise<void>) | null} */
 let closeStaticServer = null
+/** @type {string | null} */
+let dataDirectoryPath = null
+
+function resolveDataPath(relativePath) {
+  if (!dataDirectoryPath) {
+    throw new Error('Data directory is not configured.')
+  }
+  const safeRoot = path.resolve(dataDirectoryPath)
+  const filePath = path.resolve(safeRoot, relativePath)
+  if (!filePath.startsWith(safeRoot)) {
+    throw new Error('Invalid path.')
+  }
+  return filePath
+}
+
+function registerDataDirectoryIpc() {
+  ipcMain.handle('data-directory:pick', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || !result.filePaths[0]) {
+      return null
+    }
+    dataDirectoryPath = path.resolve(result.filePaths[0])
+    return dataDirectoryPath
+  })
+
+  ipcMain.handle('data-directory:get-path', () => dataDirectoryPath)
+
+  ipcMain.handle('data-directory:set-path', (_, nextPath) => {
+    dataDirectoryPath =
+      typeof nextPath === 'string' && nextPath.trim()
+        ? path.resolve(nextPath.trim())
+        : null
+    return dataDirectoryPath
+  })
+
+  ipcMain.handle('data-directory:read-file', async (_, relativePath) => {
+    try {
+      const filePath = resolveDataPath(String(relativePath))
+      const data = await readFile(filePath)
+      return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('data-directory:write-file', async (_, relativePath, data) => {
+    const filePath = resolveDataPath(String(relativePath))
+    await mkdir(path.dirname(filePath), { recursive: true })
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+    await writeFile(filePath, bytes)
+  })
+
+  ipcMain.handle('data-directory:remove', async (_, relativePath) => {
+    try {
+      const filePath = resolveDataPath(String(relativePath))
+      await rm(filePath, { recursive: true, force: true })
+    } catch {
+      /* best effort */
+    }
+  })
+
+  ipcMain.handle('data-directory:exists', async (_, relativePath) => {
+    try {
+      const filePath = resolveDataPath(String(relativePath))
+      await access(filePath)
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('app:quit', () => {
+    app.exit(0)
+  })
+
+  ipcMain.handle('backup:save-as', async (_, defaultFileName, data) => {
+    const safeName =
+      typeof defaultFileName === 'string' && defaultFileName.trim()
+        ? path.basename(defaultFileName.trim())
+        : 'personal-finance-backup.zip'
+    let defaultDir
+    if (dataDirectoryPath) {
+      defaultDir = path.join(path.resolve(dataDirectoryPath), 'backups')
+    } else {
+      defaultDir = path.join(app.getPath('documents'), 'Personal Finance', 'backups')
+    }
+    await mkdir(defaultDir, { recursive: true })
+    const defaultPath = path.join(defaultDir, safeName)
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath,
+      filters: [{ name: 'Backup ZIP', extensions: ['zip'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return false
+    }
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+    await writeFile(result.filePath, bytes)
+    return true
+  })
+}
 
 async function createMainWindow() {
   const isDev = process.env.ELECTRON_DEV === '1'
@@ -131,6 +233,15 @@ async function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  mainWindow.on('close', (event) => {
+    event.preventDefault()
+    mainWindow?.webContents.send('app:request-close')
+  })
+
+  mainWindow.webContents.on('context-menu', (event) => {
+    event.preventDefault()
+  })
 }
 
 if (gotSingleInstanceLock) {
@@ -145,6 +256,7 @@ if (gotSingleInstanceLock) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
+    registerDataDirectoryIpc()
     void createMainWindow()
 
     app.on('activate', () => {
