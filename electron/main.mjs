@@ -82,13 +82,15 @@ function startStaticServer(rootDir, port = PROD_STATIC_PORT) {
       resolve({
         port: address.port,
         close: () =>
-          new Promise((closeResolve, closeReject) => {
-            server.close((error) => {
-              if (error) {
-                closeReject(error)
-              } else {
-                closeResolve()
-              }
+          new Promise((closeResolve) => {
+            const done = () => {
+              closeResolve()
+            }
+            const timer = setTimeout(done, 1000)
+            server.closeAllConnections?.()
+            server.close(() => {
+              clearTimeout(timer)
+              done()
             })
           }),
       })
@@ -109,15 +111,18 @@ let closePromptInFlight = false
 
 async function finishAppQuit() {
   appQuitting = true
-  try {
-    await closeStaticServer?.()
-  } catch {
-    /* best effort */
-  }
-  closeStaticServer = null
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.destroy()
+    }
+  }
+  const closeServer = closeStaticServer
+  closeStaticServer = null
+  if (closeServer) {
+    try {
+      await closeServer()
+    } catch {
+      /* best effort */
     }
   }
   app.exit(0)
@@ -127,7 +132,7 @@ async function finishAppQuit() {
  * @param {import('electron').BrowserWindow} win
  * @param {number} [timeoutMs]
  */
-function requestQuitPrepFromRenderer(win, timeoutMs = 120_000) {
+function requestQuitPrepFromRenderer(win, timeoutMs = 20_000) {
   return new Promise((resolve, reject) => {
     /** @type {NodeJS.Timeout} */
     let timeout
