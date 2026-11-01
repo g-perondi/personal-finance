@@ -9,6 +9,7 @@ import { AppSettingsProvider } from './context/AppSettingsProvider.tsx'
 import './index.css'
 import { installContextMenuBlock } from './lib/disable-context-menu.ts'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
+import { ElectronWindowClose } from './components/ElectronWindowClose.tsx'
 
 installContextMenuBlock()
 
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary>
       <DbProvider>
+        <ElectronWindowClose />
         <DbGate>
           <BrowserRouter>
             <AppSettingsProvider>

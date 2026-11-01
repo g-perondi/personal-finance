@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate, type To } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useMemo, type MouseEvent } from 'react'
 import {
   ArrowLeftRight,
   FolderOpen,
@@ -9,10 +9,8 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Modal } from '../ui/Modal'
 import { useAppSettings } from '../../context/AppSettingsProvider'
 import { useSettingsLeaveGuard } from '../../context/settings-leave-guard-context'
-import { syncToDataDirectory } from '../../lib/data-directory/sync'
 
 const baseNavItems: Array<{
   to: string
@@ -43,13 +41,10 @@ function navLinkClass(isActive: boolean): string {
 }
 
 export function AppShell() {
-  const { settings, dataDirectoryDisplayPath } = useAppSettings()
+  const { settings } = useAppSettings()
   const location = useLocation()
   const navigate = useNavigate()
   const { registration, requestLeave } = useSettingsLeaveGuard()
-  const [exitOpen, setExitOpen] = useState(false)
-  const [exitWorking, setExitWorking] = useState(false)
-  const [exitError, setExitError] = useState<string | null>(null)
 
   const tryNavigateFromSettings = useCallback(
     (event: MouseEvent<HTMLAnchorElement>, to: To) => {
@@ -84,34 +79,6 @@ export function AppShell() {
       }),
     [settings.documentsEnabled, settings.investmentsEnabled],
   )
-
-  useEffect(() => {
-    const desktop = window.electronDesktop
-    if (!desktop?.onRequestClose) {
-      return
-    }
-    return desktop.onRequestClose(() => {
-      setExitError(null)
-      setExitOpen(true)
-    })
-  }, [])
-
-  async function confirmExit() {
-    setExitWorking(true)
-    setExitError(null)
-    try {
-      if (dataDirectoryDisplayPath) {
-        await syncToDataDirectory(settings)
-      }
-      window.electronDesktop?.quit?.()
-      setExitOpen(false)
-    } catch (error: unknown) {
-      setExitError(
-        error instanceof Error ? error.message : 'Unable to sync before exit.',
-      )
-      setExitWorking(false)
-    }
-  }
 
   return (
     <>
@@ -154,41 +121,6 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-
-      <Modal
-        title="Exit application?"
-        open={exitOpen}
-        onClose={() => !exitWorking && setExitOpen(false)}
-      >
-        <p className="text-sm text-slate-300">
-          {dataDirectoryDisplayPath
-            ? 'Sync to your data folder and exit?'
-            : 'Close the application?'}
-        </p>
-        {exitError ? (
-          <p className="mt-3 text-sm text-red-400" role="alert">
-            {exitError}
-          </p>
-        ) : null}
-        <div className="mt-6 flex justify-center gap-3">
-          <button
-            type="button"
-            className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
-            disabled={exitWorking}
-            onClick={() => setExitOpen(false)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white disabled:opacity-50"
-            disabled={exitWorking}
-            onClick={() => void confirmExit()}
-          >
-            {exitWorking ? 'Syncing…' : 'Exit'}
-          </button>
-        </div>
-      </Modal>
     </>
   )
 }

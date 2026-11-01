@@ -103,6 +103,7 @@ let mainWindow = null
 let closeStaticServer = null
 /** @type {string | null} */
 let dataDirectoryPath = null
+let appQuitting = false
 
 function resolveDataPath(relativePath) {
   if (!dataDirectoryPath) {
@@ -174,8 +175,18 @@ function registerDataDirectoryIpc() {
     }
   })
 
-  ipcMain.handle('app:quit', () => {
-    app.exit(0)
+  ipcMain.handle('app:quit', async () => {
+    appQuitting = true
+    try {
+      await closeStaticServer?.()
+    } catch {
+      /* best effort */
+    }
+    closeStaticServer = null
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.destroy()
+    }
+    app.quit()
   })
 
   ipcMain.handle('backup:save-as', async (_, defaultFileName, data) => {
@@ -235,8 +246,14 @@ async function createMainWindow() {
   })
 
   mainWindow.on('close', (event) => {
+    if (appQuitting) {
+      return
+    }
     event.preventDefault()
-    mainWindow?.webContents.send('app:request-close')
+    if (!mainWindow || mainWindow.webContents.isDestroyed()) {
+      return
+    }
+    mainWindow.webContents.send('app:request-close')
   })
 
   mainWindow.webContents.on('context-menu', (event) => {
