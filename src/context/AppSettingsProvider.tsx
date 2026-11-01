@@ -32,6 +32,7 @@ import {
   pickDataDirectoryFromUserGesture,
   resolveDataDirectoryDisplayPath,
 } from '../lib/data-directory/storage'
+import { hasElectronDesktopBridge } from '../lib/electron-shell'
 import {
   seedDataDirectoryIfEmpty,
   syncFromDataDirectory,
@@ -282,10 +283,8 @@ export function AppSettingsProvider({ children }: AppSettingsProviderProps) {
       syncMessage,
       dataDirectoryReady,
       dataDirectoryDisplayPath,
-      supportsDataDirectory:
-        canUseBrowserDataDirectory() || Boolean(window.electronDesktop?.isElectron),
-      dataDirectoryEmbeddedFrame:
-        isEmbeddedAppFrame() && !window.electronDesktop?.isElectron,
+      supportsDataDirectory: canUseBrowserDataDirectory() || hasElectronDesktopBridge(),
+      dataDirectoryEmbeddedFrame: isEmbeddedAppFrame() && !hasElectronDesktopBridge(),
       updateSettings,
       commitDataDirectorySelection,
       pickDataDirectory: pickDataDirectoryAction,
@@ -330,25 +329,4 @@ export function useAppSettings(): AppSettingsContextValue {
     throw new Error('useAppSettings must be used within AppSettingsProvider')
   }
   return ctx
-}
-
-/** @deprecated use useAppSettings */
-export function useDataDirectory(): Pick<
-  AppSettingsContextValue,
-  | 'dataDirectoryReady'
-  | 'dataDirectoryDisplayPath'
-  | 'pickDataDirectory'
-  | 'syncNow'
-  | 'disconnectDataFolder'
-  | 'supportsDataDirectory'
-> {
-  const ctx = useAppSettings()
-  return {
-    dataDirectoryReady: ctx.dataDirectoryReady,
-    dataDirectoryDisplayPath: ctx.dataDirectoryDisplayPath,
-    pickDataDirectory: ctx.pickDataDirectory,
-    syncNow: ctx.syncNow,
-    disconnectDataFolder: ctx.disconnectDataFolder,
-    supportsDataDirectory: ctx.supportsDataDirectory,
-  }
 }

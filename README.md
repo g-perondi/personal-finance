@@ -39,20 +39,21 @@ Packaged app for daily use (no Node server while using the app). Data stays loca
 ```bash
 npm run electron:dev          # Vite + Electron window (http://localhost:5173)
 npm run build:electron        # Frontend build with relative asset paths (./)
-npm run electron:pack           # Clear artifacts/, icons, build:electron (no installer)
+npm run electron:pack           # Prune old build dirs, icons, build:electron (no installer)
 npm run electron:build:win      # Windows portable .exe under artifacts/ (run on Windows)
 npm run electron:build:mac      # macOS .dmg + .zip under artifacts/ (run on macOS)
+npm run cleanup:artifacts       # Remove release/, artifacts/win-unpacked/, and stale artifacts-* folders
 npm run electron:build:all      # Build for the current OS only (see platform notes)
 npm run electron:build          # Alias for electron:build:win
 ```
 
 **Both platforms:** `electron-builder` cannot cross-compile (Windows builds need Windows, macOS builds need macOS). To produce **both** installers, either run each script on the matching machine or trigger the **Electron build** GitHub Actions workflow (`.github/workflows/electron-build.yml`) on a tag `v*` or manually — it uploads Windows and macOS artifacts from the run.
 
-**Platform notes:** Each `electron:pack` clears `artifacts/` before packaging, so one local run produces one platform’s output at a time.
+**Platform notes:** `electron-builder` writes to a temporary `release/` folder, then copies installers into `artifacts/`. `electron:pack` clears `release/` and `artifacts/win-unpacked/` when possible (close the app and File Explorer if delete fails).
 
 **Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app.
 
-**After code changes:** run the build for your OS (`electron:build:win` or `electron:build:mac`) and replace the app in `artifacts/`.
+**After code changes:** run the build for your OS (`electron:build:win` or `electron:build:mac`) and launch **`artifacts/Personal Finance x.y.z.exe`** (portable). Do not run `artifacts/win-unpacked/Personal Finance.exe` — that folder is unpack debris and may contain a corrupt `app.asar`.
 
 ## Code style
 

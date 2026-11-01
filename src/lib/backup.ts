@@ -16,6 +16,7 @@ import {
 } from './data-directory/storage'
 import { BACKUPS_DIR } from './data-directory/types'
 import { utcNowIso } from './datetime'
+import { hasElectronDesktopBridge } from './electron-shell'
 
 export const BACKUP_FORMAT_VERSION = 1
 const MANIFEST_PATH = 'manifest.json'
@@ -24,7 +25,7 @@ const BLOB_PREFIX = 'blobs/'
 const MAX_BACKUP_BYTES = 100 * 1024 * 1024
 
 function isElectronDesktop(): boolean {
-  return Boolean(window.electronDesktop?.isElectron)
+  return hasElectronDesktopBridge()
 }
 
 function padUtc(n: number): string {

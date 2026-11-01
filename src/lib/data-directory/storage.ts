@@ -3,9 +3,10 @@ import {
   loadDataDirectoryHandle,
   saveDataDirectoryHandle,
 } from '../../db/idb'
+import { hasElectronDesktopBridge } from '../electron-shell'
 
 function isElectronDesktop(): boolean {
-  return Boolean(window.electronDesktop?.isElectron)
+  return hasElectronDesktopBridge()
 }
 
 let browserDirectoryHandle: FileSystemDirectoryHandle | null = null

@@ -710,9 +710,6 @@ export function InvestmentPage() {
 
       <div className="app-page-scroll-ceiling investments-split">
         <section className="investments-panel investments-panel--holdings">
-          <h3 className="mb-3 shrink-0 text-lg font-semibold text-white">
-            Open positions
-          </h3>
           <div
             className={`data-table-scroll-shell min-h-0 min-w-0 flex-1 ${APP_SCROLLBAR_CLASS}`}
           >

@@ -13,9 +13,10 @@
     "electron:dev": "concurrently -k \"npm run dev\" \"npm run electron:start\"",
     "electron:pack": "node scripts/electron-prebuild.mjs && npm run icons && npm run build:electron",
     "electron:build": "npm run electron:build:win",
-    "electron:build:win": "npm run electron:pack && electron-builder --win",
-    "electron:build:mac": "npm run electron:pack && electron-builder --mac",
+    "electron:build:win": "npm run electron:pack && electron-builder --win && node scripts/electron-promote-artifacts.mjs",
+    "electron:build:mac": "npm run electron:pack && electron-builder --mac && node scripts/electron-promote-artifacts.mjs",
     "electron:build:all": "node scripts/electron-build-all.mjs",
+    "cleanup:artifacts": "node scripts/cleanup-artifact-dirs.mjs",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write .",
@@ -28,7 +29,7 @@
     "productName": "Personal Finance",
     "icon": "build/icon.png",
     "directories": {
-      "output": "artifacts",
+      "output": "release",
       "buildResources": "build"
     },
     "files": [

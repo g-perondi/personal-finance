@@ -12,7 +12,6 @@ dist
 dist-ssr
 release
 artifacts
-artifacts-fresh
 build/icon.png
 *.local
 

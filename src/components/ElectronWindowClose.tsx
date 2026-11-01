@@ -5,6 +5,7 @@ import { loadAppSettings } from '../db/repositories/app_setting'
 import { isDataDirectoryAvailable } from '../lib/data-directory/storage'
 import { syncToDataDirectory } from '../lib/data-directory/sync'
 import { Modal } from './ui/Modal'
+import { isElectronApp } from '../lib/electron-shell'
 
 export function ElectronWindowClose() {
   const { status: dbStatus } = useDbContext()
@@ -48,7 +49,7 @@ export function ElectronWindowClose() {
     }
   }
 
-  if (!window.electronDesktop?.isElectron) {
+  if (!isElectronApp()) {
     return null
   }
 

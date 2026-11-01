@@ -259,6 +259,7 @@ function registerDataDirectoryIpc() {
 
 async function createMainWindow() {
   const isDev = process.env.ELECTRON_DEV === '1'
+  const isWin = process.platform === 'win32'
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -266,12 +267,23 @@ async function createMainWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Personal Finance',
-    frame: false,
+    frame: isWin,
+    ...(isWin
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            color: '#020617',
+            symbolColor: '#94a3b8',
+            height: 40,
+          },
+        }
+      : { frame: false }),
     backgroundColor: '#020617',
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false,
       preload: path.join(currentDir, 'preload.mjs'),
     },
   })
@@ -316,6 +328,14 @@ async function createMainWindow() {
   })
 
   notifyWindowMaximized(mainWindow)
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Renderer process gone:', details.reason, details.exitCode)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => {
+    console.error('Window failed to load:', code, description, url)
+  })
 }
 
 if (gotSingleInstanceLock) {
