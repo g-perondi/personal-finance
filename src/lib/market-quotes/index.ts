@@ -1,3 +1,17 @@
-export { resolveInstrument } from './resolve'
-export { clearQuoteMemoryCache, fetchQuotes } from './fetch'
-export type { QuoteFetchError, QuoteResult, ResolvedInstrument } from './types'
+export {
+  parseIsinFromQuery,
+  searchEtfListings,
+  searchEquityListings,
+  searchCryptoAssets,
+  searchInstrumentListings,
+  resolveInstrumentListing,
+  resolveInstrument,
+} from './resolve/index'
+export { clearQuoteMemoryCache, fetchQuotes, fetchQuotesForInstruments } from './fetch'
+export type { InstrumentQuoteRequest } from './fetchQuotes'
+export type {
+  QuoteFetchError,
+  QuoteResult,
+  ResolvedInstrument,
+  AssetKind,
+} from './types'

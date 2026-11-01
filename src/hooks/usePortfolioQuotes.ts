@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { computePortfolioTotals, listHoldings } from '../db/repositories/holding'
 import type { HoldingListItem } from '../db/repositories/model'
 import {
@@ -6,7 +6,7 @@ import {
   getStaleCachedQuoteCents,
   setCachedQuoteCents,
 } from '../db/repositories/instrument'
-import { fetchQuotes } from '../lib/market-quotes'
+import { fetchQuotesForInstruments } from '../lib/market-quotes'
 import type { Database } from 'sql.js'
 import { useDatabase } from './useDatabase'
 
@@ -60,8 +60,10 @@ function readCachedQuotePrices(
 export function usePortfolioQuotes(accountId?: string): PortfolioQuotesResult {
   const db = useDatabase()
   const [dataRevision, setDataRevision] = useState(0)
-  void dataRevision
-  const holdings = listHoldings(db, accountId ? { accountId } : {})
+  const holdings = useMemo(() => {
+    void dataRevision
+    return listHoldings(db, accountId ? { accountId } : {})
+  }, [db, accountId, dataRevision])
   const holdingsKey = holdingsCacheKey(holdings)
 
   const cachedSnapshot = useMemo(
@@ -90,8 +92,11 @@ export function usePortfolioQuotes(accountId?: string): PortfolioQuotesResult {
     setLoading(true)
 
     try {
-      const symbols = [...new Set(holdings.map((h) => h.quoteSymbol))]
-      const { quotes, errors: fetchErrors } = await fetchQuotes(symbols)
+      const requests = holdings.map((h) => ({
+        quoteSymbol: h.quoteSymbol,
+        assetKind: h.instrumentAssetKind,
+      }))
+      const { quotes, errors: fetchErrors } = await fetchQuotesForInstruments(requests)
       const map = new Map<string, number>()
       let latest: string | null = null
       let missing = 0
@@ -152,6 +157,15 @@ export function usePortfolioQuotes(accountId?: string): PortfolioQuotesResult {
       setLoading(false)
     }
   }, [db, holdings, holdingsKey])
+
+  useEffect(() => {
+    if (holdings.length === 0) {
+      return
+    }
+    queueMicrotask(() => {
+      void refreshQuotes()
+    })
+  }, [holdings.length, holdingsKey, refreshQuotes])
 
   const usingFetchSnapshot =
     fetchSnapshot !== null && fetchSnapshot.holdingsKey === holdingsKey
