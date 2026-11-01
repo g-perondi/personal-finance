@@ -3,6 +3,9 @@ import type { ResolvedInstrument } from './types'
 const CORS_PROXY = 'https://proxy.cors.dev/'
 const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/
 
+const EURO_LISTING_SUFFIX = /\.(DE|MI|AS|PA|BR|HE|F)$/
+const EURO_EXCHANGES = new Set(['GER', 'MIL', 'AMS', 'PAR', 'DUS', 'STU', 'MUN', 'EBS'])
+
 function proxyUrl(target: string): string {
   return `${CORS_PROXY}${target}`
 }
@@ -19,29 +22,88 @@ type YahooSearchQuote = {
   exchange?: string
 }
 
-async function yahooSearch(query: string): Promise<ResolvedInstrument | null> {
+async function yahooSearchQuotes(query: string): Promise<YahooSearchQuote[]> {
   const url = proxyUrl(
-    `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`,
+    `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&newsCount=0`,
   )
   const response = await fetch(url)
   if (!response.ok) {
-    return null
+    return []
   }
   const payload = (await response.json()) as { quotes?: YahooSearchQuote[] }
-  const quotes = payload.quotes ?? []
-  const etfLike =
-    quotes.find((q) => q.quoteType === 'ETF' && q.symbol) ??
-    quotes.find((q) => q.symbol)
-  if (!etfLike?.symbol) {
-    return null
+  return payload.quotes ?? []
+}
+
+function scoreEtfListing(quote: YahooSearchQuote): number {
+  if (quote.quoteType !== 'ETF' || !quote.symbol) {
+    return Number.NEGATIVE_INFINITY
   }
-  const name = etfLike.longname ?? etfLike.shortname ?? etfLike.symbol
-  const isin = ISIN_PATTERN.test(query) ? query : null
+  let score = 0
+  if (EURO_LISTING_SUFFIX.test(quote.symbol)) {
+    score += 100
+  }
+  if (quote.exchange && EURO_EXCHANGES.has(quote.exchange)) {
+    score += 40
+  }
+  if (quote.symbol.endsWith('.L')) {
+    score -= 50
+  }
+  if (quote.symbol.endsWith('.SW')) {
+    score -= 20
+  }
+  return score
+}
+
+function pickPreferredEtfQuote(quotes: YahooSearchQuote[]): YahooSearchQuote | null {
+  let best: YahooSearchQuote | null = null
+  let bestScore = Number.NEGATIVE_INFINITY
+  for (const quote of quotes) {
+    const score = scoreEtfListing(quote)
+    if (score > bestScore && quote.symbol) {
+      best = quote
+      bestScore = score
+    }
+  }
+  return best
+}
+
+function toResolvedInstrument(
+  quote: YahooSearchQuote,
+  isin: string | null,
+): ResolvedInstrument {
+  const name = quote.longname ?? quote.shortname ?? quote.symbol ?? ''
   return {
-    quoteSymbol: etfLike.symbol,
+    quoteSymbol: quote.symbol!,
     name,
     isin,
   }
+}
+
+async function resolveFromYahooSearch(
+  query: string,
+  isin: string | null,
+): Promise<ResolvedInstrument | null> {
+  let quotes = await yahooSearchQuotes(query)
+  if (quotes.length === 0) {
+    return null
+  }
+
+  if (isin) {
+    const seed = pickPreferredEtfQuote(quotes) ?? quotes.find((q) => q.symbol)
+    const fundName = seed?.longname ?? seed?.shortname
+    if (fundName && fundName !== query) {
+      const byName = await yahooSearchQuotes(fundName)
+      if (byName.length > 0) {
+        quotes = byName
+      }
+    }
+  }
+
+  const picked = pickPreferredEtfQuote(quotes)
+  if (!picked?.symbol) {
+    return null
+  }
+  return toResolvedInstrument(picked, isin)
 }
 
 /** Resolve ISIN or ticker to a Yahoo/API quote symbol and display name. */
@@ -51,23 +113,17 @@ export async function resolveInstrument(query: string): Promise<ResolvedInstrume
     throw new Error('Enter an ISIN or ticker symbol.')
   }
 
-  const fromSearch = await yahooSearch(normalized)
+  const isin = ISIN_PATTERN.test(normalized) ? normalized : null
+  const fromSearch = await resolveFromYahooSearch(normalized, isin)
   if (fromSearch) {
-    if (ISIN_PATTERN.test(normalized)) {
-      return { ...fromSearch, isin: normalized }
-    }
-    return {
-      quoteSymbol: normalized.includes('.') ? normalized : fromSearch.quoteSymbol,
-      name: fromSearch.name,
-      isin: fromSearch.isin,
-    }
+    return fromSearch
   }
 
   if (/^[A-Z0-9.]+$/.test(normalized)) {
     return {
       quoteSymbol: normalized,
       name: normalized,
-      isin: ISIN_PATTERN.test(normalized) ? normalized : null,
+      isin,
     }
   }
 

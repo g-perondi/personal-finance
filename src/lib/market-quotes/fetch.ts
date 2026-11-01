@@ -1,4 +1,5 @@
 import { utcNowIso } from '../datetime'
+import { convertToEur } from './fx'
 import type { QuoteFetchError, QuoteResult } from './types'
 
 const CORS_PROXY = 'https://proxy.cors.dev/'
@@ -74,15 +75,22 @@ async function fetchFromYahooChart(symbol: string): Promise<QuoteResult | null> 
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(candidate)}?range=1d&interval=1d`,
     )
     const payload = await fetchJsonSafe<{
-      chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> }
+      chart?: {
+        result?: Array<{
+          meta?: { regularMarketPrice?: number; currency?: string; symbol?: string }
+        }>
+      }
     }>(url)
-    const price = payload?.chart?.result?.[0]?.meta?.regularMarketPrice
+    const meta = payload?.chart?.result?.[0]?.meta
+    const price = meta?.regularMarketPrice
     if (typeof price !== 'number' || price <= 0) {
       continue
     }
+    const currency = meta?.currency ?? 'EUR'
+    const priceEur = await convertToEur(price, currency)
     return {
       quoteSymbol: symbol,
-      priceEur: price,
+      priceEur,
       fetchedAt: utcNowIso(),
       source: 'yahoo',
     }
