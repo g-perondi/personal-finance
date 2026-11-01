@@ -1,6 +1,6 @@
 # Personal Finance
 
-Browser-only personal finance SPA: multi-account tracking, transfers, categorized expenses (recurring vs variable), a single global dashboard, and administrative documents. No backend, no authentication — all data stays on your machine (SQLite via sql.js + IndexedDB).
+Personal finance SPA (browser or packaged **Electron** desktop): multi-account tracking, transfers, categorized expenses (recurring vs variable), a single global dashboard, optional investments and documents. No backend, no authentication — data stays on your machine (SQLite via sql.js + IndexedDB, with optional sync to a user-chosen **data folder**).
 
 ## Stack
 
@@ -32,7 +32,7 @@ npm run lint:fix      # Oxlint auto-fix where supported
 
 ### Desktop (Electron)
 
-Packaged app for daily use (no Node server while using the app). Data stays local in the app’s Chromium profile (IndexedDB), separate from Chrome/Edge. The desktop build serves the UI at a **fixed** `http://127.0.0.1:39217` origin so IndexedDB survives restarts (do not change that port in `electron/main.mjs` without a migration plan).
+Packaged app for daily use (no Node server while using the app). Primary storage is still IndexedDB inside the app’s Chromium profile (separate from Chrome/Edge). You can point **Settings → Data folder** at a directory on disk; the app syncs `sqlite.db`, documents, settings, and default backup location there (see [Data storage](#data-storage)). The desktop build serves the UI at a **fixed** `http://127.0.0.1:39217` origin so IndexedDB survives restarts (do not change that port in `electron/main.mjs` without a migration plan).
 
 **Prerequisites:** Node.js for building only.
 
@@ -51,9 +51,21 @@ npm run electron:build          # Alias for electron:build:win
 
 **Platform notes:** `electron-builder` writes to a temporary `release/` folder, then copies installers into `artifacts/`. `electron:pack` clears `release/` and `artifacts/win-unpacked/` when possible (close the app and File Explorer if delete fails).
 
-**Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app.
+**Moving data from the browser:** IndexedDB is per origin. Export **Download backup** in the browser, then **Restore backup** in the desktop app (or configure the same data folder in both if you use folder sync).
 
 **After code changes:** run the build for your OS (`electron:build:win` or `electron:build:mac`) and launch **`artifacts/Personal Finance x.y.z.exe`** (portable). Do not run `artifacts/win-unpacked/Personal Finance.exe` — that folder is unpack debris and may contain a corrupt `app.asar`.
+
+## Data storage
+
+| Layer                      | Role                                                                                                                                                |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **IndexedDB**              | Working copy: SQLite snapshot (`sqlite`) + legacy blob keys; browser FSA folder handle when configured                                              |
+| **Data folder** (optional) | On disk: `sqlite.db`, `documents/`, `manifest.json`, `settings.json`, `backups/` — imported on startup when linked, exported on exit / **Sync now** |
+| **Backup ZIP**             | Portable full export (sidebar or Settings → local data); restore replaces IndexedDB and writes into the data folder when available                  |
+
+Configure the folder under **Settings** (`/settings`): locale, time zone, feature toggles, data directory, backup/restore, and **Clear all data**. Clearing wipes IndexedDB and document blobs, removes synced files from the connected folder, unlinks the folder, then reloads with an empty database.
+
+Details: [`src/db/README.md`](src/db/README.md) (schema, migrations, backup contract).
 
 ## Code style
 
@@ -65,15 +77,15 @@ npm run electron:build          # Alias for electron:build:win
 ```text
 src/
   components/   # Shared UI (AppShell, dashboard widgets, documents, …)
-  pages/        # Routes: dashboard, transactions, investments, accounts, categories, documents
+  pages/        # Routes: dashboard, transactions, investments, accounts, categories, documents, settings
   db/           # sql.js init, migrations, repositories, IndexedDB helpers
-  context/      # DbProvider
-  lib/          # money, dates, savings, backup ZIP, list search helpers
+  context/      # DbProvider, AppSettingsProvider, dashboard period
+  lib/          # money, dates, savings, backup ZIP, data-directory sync, market quotes
 public/
   sql-wasm.wasm # sql.js runtime
 electron/
   main.mjs      # Electron main process (dev URL + prod static server)
-  preload.mjs   # contextBridge (desktop flag only)
+  preload.mjs   # contextBridge (desktop APIs: folder I/O, window close, save dialogs)
 ```
 
 ## Roadmap
@@ -88,18 +100,21 @@ electron/
 | 5     | Documents (MVP), sidebar backup ZIP, list search, clear local data          | Done    |
 | 6     | ETF portfolio (holdings, WAC, live quotes without API key), `/investments`  | Done    |
 | 7     | Balance reconcile (`rebalancing`), transaction modal balance preview        | Done    |
-| 7+    | Recurring rules (scheduled generation), budget, sales / richer broker tools | Planned |
+| 8     | Settings, app preferences, optional data folder sync, desktop packaging     | Done    |
+| 8+    | Recurring rules (scheduled generation), budget, sales / richer broker tools | Planned |
 
 **Phase 7 (shipped):** **Reconcile balance** on Accounts creates a `rebalancing` ledger row; transaction add/edit modal shows **Current balance** and **Balance after entry** (including transfers).
 
 **Phase 6 (shipped):** `/investments` — ETF holdings with weighted average cost, opening positions and purchases (amount + NAV → units), linked `investment` ledger rows on buy, delayed third-party quotes fetched when you open Investments or click **Refresh quotes** (dashboard shows last cached prices only; no API key).
 
-**Phase 5 (shipped):** document upload with tags and year filters; export/import backup (SQLite + document blobs); LIKE search on documents and transactions; **Clear all data** with typed confirmation in the sidebar.
+**Phase 8 (shipped):** `/settings` — locale, IANA time zone, investments/documents toggles, data folder pick + sync, backup/restore/clear in **Local data**; Electron builds with native folder and save dialogs.
+
+**Phase 5 (shipped):** document upload with tags and year filters; export/import backup (SQLite + document blobs); LIKE search on documents and transactions; **Clear all data** with typed confirmation (sidebar or Settings).
 
 **Not planned (for now):** backend, auth, multi-currency, per-account dashboard pages.
 
 ## Data notice
 
-Data lives only in this browser profile (IndexedDB: SQLite snapshot + document blobs). Use **Download backup** in the sidebar before clearing site data or switching browsers. **Restore backup** and **Clear all data** replace or wipe local data after confirmation — download a backup first if you need a copy.
+Without a data folder, everything lives in this browser or desktop profile (IndexedDB: SQLite snapshot; document files on disk when a folder is linked). Use **Download backup** before clearing site data, switching browsers, or using **Clear all data**. **Restore backup** replaces local state after confirmation. **Clear all data** removes IndexedDB, clears synced files from the linked folder, and disconnects the folder link — then reloads empty. Download a backup first if you need a copy.
 
 **Compatibility:** newer app versions must still **restore backup ZIP files** created by older versions (see [`src/db/README.md`](src/db/README.md)).
