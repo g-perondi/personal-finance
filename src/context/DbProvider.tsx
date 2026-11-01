@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { initDatabase, resetDatabaseForRetry } from '../db/database'
+import { initDatabase, resetDatabaseForRetry, flushPersist } from '../db/database'
 import { DbContext, type DbContextValue, type DbStatus } from './db-context'
 
 function resolveErrorMessage(error: unknown): string {
@@ -52,6 +52,19 @@ export function DbProvider({ children }: DbProviderProps) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const flushOnExit = () => {
+      if (status !== 'ready') {
+        return
+      }
+      void flushPersist()
+    }
+    window.addEventListener('pagehide', flushOnExit)
+    return () => {
+      window.removeEventListener('pagehide', flushOnExit)
+    }
+  }, [status])
 
   const retry = useCallback(() => {
     setStatus('loading')
