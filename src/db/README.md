@@ -171,17 +171,18 @@ Case-insensitive **LIKE** on **description**, **account name**, and **category n
 
 ## Backup
 
-Full export is a **ZIP** (`formatVersion` 1) built in [`src/lib/backup.ts`](../lib/backup.ts):
+Full export is a **ZIP** (`formatVersion` 2) built in [`src/lib/backup.ts`](../lib/backup.ts):
 
-| Entry                | Content                                                                        |
-| -------------------- | ------------------------------------------------------------------------------ |
-| `manifest.json`      | `formatVersion`, `exportedAt` (UTC ISO), `schemaVersion`, `blobIds`            |
-| `sqlite.db`          | sql.js snapshot (same bytes as IndexedDB key `sqlite`)                         |
-| `blobs/{documentId}` | Raw file bytes from **`documents/`** on the data folder (ZIP layout unchanged) |
+| Entry                               | Content                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `manifest.json`                     | `formatVersion`, `exportedAt` (UTC ISO), `schemaVersion`, `blobIds` (document ids whose files are in the ZIP) |
+| `sqlite.db`                         | sql.js snapshot (same bytes as IndexedDB key `sqlite`)                                                        |
+| `documents/{documentId}/{fileName}` | PDF or image bytes, same relative path as the data folder (`fileName` keeps `.pdf`, `.jpg`, `.png`, `.webp`)  |
+| `blobs/{documentId}`                | Legacy layout from `formatVersion` 1. Restore still reads these entries.                                      |
 
 **Export:** flushes the in-memory DB, reads document files from the data folder when configured, then zips. The app opens a **Save** dialog (browser: File System Access save picker; desktop: native save dialog). The default folder is **`backups/`** under your configured data directory when one is set. Max **100 MB** per archive.
 
-**Restore:** replaces the SQLite snapshot, writes blobs into **`documents/`** when a data folder is available, validates manifest, then **`window.location.reload()`**.
+**Restore:** replaces the SQLite snapshot, writes each document file into **`documents/{id}/{fileName}`** when a data folder is available, validates manifest, then **`window.location.reload()`**. Accepts `formatVersion` 1 (`blobs/{id}`) and 2 (`documents/{id}/{fileName}`).
 
 UI: sidebar footer **Download backup** / **Restore backup** / **Clear all data** (English). Restore and clear are destructive — confirm in a modal before proceeding.
 
@@ -193,7 +194,7 @@ This applies to:
 
 1. **Backup ZIP** (`manifest.formatVersion` in [`backup.ts`](../lib/backup.ts)) — if you introduce a new format version, **restore must still accept every previous `formatVersion`** (implement explicit branches or adapters; do not drop support without a documented migration tool).
 2. **SQLite inside the ZIP** — after restore, `runMigrations()` upgrades older `schema_version` snapshots forward. **Migrations must be additive and safe** for data created under prior schema versions (no silent data loss).
-3. **Document blobs** — IDs referenced in SQLite must keep matching `blobs/{id}` entries; do not rename blob layout without import support for the old layout.
+3. **Document files** — IDs referenced in SQLite must keep matching a file in the ZIP. Current exports use `documents/{id}/{fileName}`. Restore must keep accepting the legacy `blobs/{id}` layout.
 
 Treat a user’s backup file as a long-lived contract: browser, Electron, and future channels all share the same export format.
 
