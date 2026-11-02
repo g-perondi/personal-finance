@@ -37,6 +37,8 @@ export type CategoryRecord = {
   defaultRecurrenceKind: RecurrenceKind | null
   /** UTC ISO 8601 */
   createdAt: UtcIsoString
+  /** Managed by the app; hidden from the Categories page. */
+  isSystem: boolean
 }
 
 export type TransactionRecord = {

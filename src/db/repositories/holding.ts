@@ -8,6 +8,7 @@ import {
   type UtcIsoString,
 } from '../../lib/datetime'
 import { createSimpleTransaction, updateSimpleTransaction } from './transaction'
+import { getInvestmentsCategoryId } from './category'
 import type {
   HoldingListItem,
   HoldingPurchaseListItem,
@@ -348,7 +349,7 @@ export function updateHoldingPurchase(
       amountCents: input.amountCents,
       transactionDate: input.purchaseDate,
       description: purchase.instrumentName,
-      categoryId: null,
+      categoryId: getInvestmentsCategoryId(db),
       recurrenceKind: 'variable',
     })
   }
@@ -419,7 +420,7 @@ export function createOpeningHolding(
       amountCents: totalCostCents,
       transactionDate: input.openingDate,
       description: instrument.name,
-      categoryId: null,
+      categoryId: getInvestmentsCategoryId(db),
       recurrenceKind: 'variable',
     })
     transactionId = tx.id
@@ -454,6 +455,8 @@ export type RecordHoldingPurchaseInput = {
   amountCents: number
   priceCentsPerUnit: number
   description?: string | null
+  /** When true (default), posts an `investment` transaction on the account (cashflow). */
+  recordInvestmentTransaction?: boolean
 }
 
 export function recordHoldingPurchase(
@@ -487,15 +490,20 @@ export function recordHoldingPurchase(
   }
 
   const purchaseDate = parseCalendarDateForStorage(input.purchaseDate)
-  const tx = createSimpleTransaction(db, {
-    accountId: input.accountId,
-    kind: 'investment',
-    amountCents: input.amountCents,
-    transactionDate: input.purchaseDate,
-    description: input.description?.trim() || instrument.name,
-    categoryId: null,
-    recurrenceKind: 'variable',
-  })
+  const recordLedger = input.recordInvestmentTransaction !== false
+  let transactionId: string | null = null
+  if (recordLedger) {
+    const tx = createSimpleTransaction(db, {
+      accountId: input.accountId,
+      kind: 'investment',
+      amountCents: input.amountCents,
+      transactionDate: input.purchaseDate,
+      description: input.description?.trim() || instrument.name,
+      categoryId: getInvestmentsCategoryId(db),
+      recurrenceKind: 'variable',
+    })
+    transactionId = tx.id
+  }
 
   const purchaseId = newId()
   db.run(
@@ -506,7 +514,7 @@ export function recordHoldingPurchase(
     [
       purchaseId,
       holding.id,
-      tx.id,
+      transactionId,
       purchaseDate,
       input.amountCents,
       input.priceCentsPerUnit,

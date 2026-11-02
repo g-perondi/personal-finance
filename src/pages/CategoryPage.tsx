@@ -7,7 +7,7 @@ import type { CategoryType, RecurrenceKind } from '../db/types'
 import {
   createCategory,
   deleteCategory,
-  listCategories,
+  listUserCategories,
   updateCategory,
 } from '../db/repositories/category'
 import type { CategoryRecord } from '../db/repositories/model'
@@ -221,12 +221,12 @@ export function CategoryPage() {
 
   const expenseCategories = useMemo(() => {
     void refreshKey
-    return listCategories(db, 'expense')
+    return listUserCategories(db, 'expense')
   }, [db, refreshKey])
 
   const incomeCategories = useMemo(() => {
     void refreshKey
-    return listCategories(db, 'income')
+    return listUserCategories(db, 'income')
   }, [db, refreshKey])
 
   const bump = useCallback(() => setRefreshKey((k) => k + 1), [])

@@ -450,6 +450,9 @@ export function TransactionPage() {
   }
 
   const filteredCategories = categories.filter((category) => {
+    if (category.isSystem) {
+      return false
+    }
     if (form.kind === 'income') {
       return category.type === 'income'
     }
@@ -889,7 +892,7 @@ export function TransactionPage() {
             />
           </label>
 
-          {form.kind !== 'transfer' ? (
+          {form.kind !== 'transfer' && form.kind !== 'investment' ? (
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-slate-300">Category (optional)</span>
               <FormSelect

@@ -217,6 +217,8 @@ type PurchaseForm = {
   purchaseDate: string
   amount: string
   navPerUnit: string
+  /** When true, posts an investment transaction on the account (cashflow). */
+  recordInvestmentTransaction: boolean
 }
 
 const emptyOpeningForm = (accountId: string): OpeningForm => ({
@@ -225,7 +227,7 @@ const emptyOpeningForm = (accountId: string): OpeningForm => ({
   openingDate: todayRomeDateInputValue(),
   quantity: '',
   avgCostPerUnit: '',
-  recordInvestmentTransaction: false,
+  recordInvestmentTransaction: true,
 })
 
 export function InvestmentPage() {
@@ -264,8 +266,17 @@ export function InvestmentPage() {
   )
 
   const tabPurchases = useMemo(
-    () => recentPurchases.filter((p) => p.instrumentAssetKind === activeAssetTab),
-    [recentPurchases, activeAssetTab],
+    () =>
+      recentPurchases.filter((p) => {
+        if (p.instrumentAssetKind !== activeAssetTab) {
+          return false
+        }
+        if (accountFilter !== 'all' && p.accountId !== accountFilter) {
+          return false
+        }
+        return true
+      }),
+    [recentPurchases, activeAssetTab, accountFilter],
   )
 
   const unrealizedCents =
@@ -413,6 +424,7 @@ export function InvestmentPage() {
         purchaseDate: todayRomeDateInputValue(),
         amount: '',
         navPerUnit: '',
+        recordInvestmentTransaction: true,
       })
     } else if (tabHoldings.length === 1) {
       openPurchaseModal(tabHoldings[0])
@@ -439,6 +451,7 @@ export function InvestmentPage() {
       purchaseDate: utcIsoToRomeDateInputValue(row.purchaseDate),
       amount: centsToInputValue(row.amountCents),
       navPerUnit: unitPriceEurToInputValue(row.priceCentsPerUnit / 100),
+      recordInvestmentTransaction: Boolean(row.transactionId),
     })
     setFormError(null)
     setPurchaseOpen(true)
@@ -537,6 +550,7 @@ export function InvestmentPage() {
           purchaseDate: purchaseForm.purchaseDate,
           amountCents,
           priceCentsPerUnit,
+          recordInvestmentTransaction: purchaseForm.recordInvestmentTransaction,
         })
       }
       setPurchaseOpen(false)
@@ -829,10 +843,8 @@ export function InvestmentPage() {
           <h3 className="mb-3 shrink-0 text-lg font-semibold text-white">
             Recent purchases
           </h3>
-          <div className="recent-purchases-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div
-              className={`recent-purchases-scroll investments-recent-scroll ${APP_SCROLLBAR_CLASS}`}
-            >
+          <div className="recent-purchases-shell flex min-h-0 min-w-0 flex-col overflow-hidden">
+            <div className="recent-purchases-head shrink-0 overflow-x-auto">
               <table className="recent-purchases-table text-sm">
                 <colgroup>
                   <col className="recent-purchases-col-date" />
@@ -856,6 +868,19 @@ export function InvestmentPage() {
                     <th className="px-3 py-2">Actions</th>
                   </tr>
                 </thead>
+              </table>
+            </div>
+            <div className={`recent-purchases-body-scroll ${APP_SCROLLBAR_CLASS}`}>
+              <table className="recent-purchases-table text-sm">
+                <colgroup>
+                  <col className="recent-purchases-col-date" />
+                  <col />
+                  <col className="recent-purchases-col-account" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-money" />
+                  <col className="recent-purchases-col-actions" />
+                </colgroup>
                 <tbody className="divide-y divide-slate-800 text-slate-200">
                   {tabPurchases.length === 0 ? (
                     <tr>
@@ -1044,7 +1069,7 @@ export function InvestmentPage() {
           <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
             <input
               type="checkbox"
-              className="mt-0.5 size-4 rounded border-slate-600 bg-slate-800 text-emerald-600 focus:ring-emerald-500"
+              className="form-checkbox mt-0.5"
               checked={openingForm.recordInvestmentTransaction}
               onChange={(event) =>
                 setOpeningForm((prev) => ({
@@ -1054,7 +1079,7 @@ export function InvestmentPage() {
               }
             />
             <span>
-              Record as investment transaction
+              Deduct from account balance
               <span className="mt-0.5 block text-xs text-slate-500">
                 Turn off for assets you already hold (portfolio only, no account
                 cashflow).
@@ -1181,6 +1206,32 @@ export function InvestmentPage() {
               }
               return null
             })()}
+            {!purchaseForm.purchaseId ? (
+              <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  className="form-checkbox mt-0.5"
+                  checked={purchaseForm.recordInvestmentTransaction}
+                  onChange={(event) =>
+                    setPurchaseForm((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            recordInvestmentTransaction: event.target.checked,
+                          }
+                        : prev,
+                    )
+                  }
+                />
+                <span>
+                  Deduct from account balance
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    Turn off for external inflows (e.g. saveback) that increase holdings
+                    without spending cash on the account.
+                  </span>
+                </span>
+              </label>
+            ) : null}
             <FormError message={formError} />
             <ModalActions
               onCancel={() => {

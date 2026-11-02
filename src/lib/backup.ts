@@ -15,6 +15,7 @@ import {
   isDataDirectoryAvailable,
 } from './data-directory/storage'
 import { BACKUPS_DIR } from './data-directory/types'
+import { utcNowIso } from './datetime'
 import { DOCUMENT_MAX_BYTES } from './document-upload'
 import { hasElectronDesktopBridge } from './electron-shell'
 

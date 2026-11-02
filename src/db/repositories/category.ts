@@ -20,12 +20,15 @@ function mapCategoryRow(row: Record<string, unknown>): CategoryRecord {
     type: row.type as CategoryType,
     defaultRecurrenceKind: mapRecurrenceKind(row.default_recurrence_kind),
     createdAt: toUtcIsoString(String(row.created_at)),
+    isSystem: Number(row.is_system) === 1,
   }
 }
 
 const CATEGORY_SELECT = `
-  SELECT id, name, type, default_recurrence_kind, created_at FROM category
+  SELECT id, name, type, default_recurrence_kind, created_at, is_system FROM category
 `
+
+export const INVESTMENTS_SYSTEM_CATEGORY_ID = 'a0000000-0000-4000-8000-000000000099'
 
 const DUPLICATE_CATEGORY_NAME_MESSAGE =
   'A category with this name already exists for this type.'
@@ -83,6 +86,29 @@ export function listCategories(db: Database, type?: CategoryType): CategoryRecor
   return rows
 }
 
+/** Categories the user can manage on the Categories page (excludes system rows). */
+export function listUserCategories(
+  db: Database,
+  type?: CategoryType,
+): CategoryRecord[] {
+  return listCategories(db, type).filter((row) => !row.isSystem)
+}
+
+export function getInvestmentsCategoryId(db: Database): string {
+  const stmt = db.prepare(
+    `${CATEGORY_SELECT}
+     WHERE is_system = 1 AND type = 'expense' AND name = 'Investments' COLLATE NOCASE
+     LIMIT 1`,
+  )
+  if (!stmt.step()) {
+    stmt.free()
+    return INVESTMENTS_SYSTEM_CATEGORY_ID
+  }
+  const row = mapCategoryRow(stmt.getAsObject())
+  stmt.free()
+  return row.id
+}
+
 export function getCategoryById(db: Database, id: string): CategoryRecord | null {
   const stmt = db.prepare(`${CATEGORY_SELECT} WHERE id = ? LIMIT 1`)
   stmt.bind([id])
@@ -133,6 +159,9 @@ export function updateCategory(
   if (!existing) {
     throw new Error('Category not found.')
   }
+  if (existing.isSystem) {
+    throw new Error('System categories cannot be edited.')
+  }
   const trimmedName = input.name.trim()
   assertUniqueCategoryName(db, existing.type, trimmedName, id)
   const defaultRecurrenceKind =
@@ -159,6 +188,13 @@ export function countCategoryUsage(db: Database, categoryId: string): number {
 }
 
 export function deleteCategory(db: Database, id: string): void {
+  const existing = getCategoryById(db, id)
+  if (!existing) {
+    throw new Error('Category not found.')
+  }
+  if (existing.isSystem) {
+    throw new Error('System categories cannot be deleted.')
+  }
   const usage = countCategoryUsage(db, id)
   if (usage > 0) {
     throw new Error('Category is used by transactions and cannot be deleted.')
