@@ -12,6 +12,7 @@ import instrumentAssetKindSql from './014_instrument_asset_kind.sql?raw'
 import appSettingSql from './015_app_setting.sql?raw'
 import transferDeletedAccountLabelSql from './016_transfer_deleted_account_label.sql?raw'
 import categorySystemInvestmentsSql from './017_category_system_investments.sql?raw'
+import transactionAffectsBalanceSql from './018_transaction_affects_balance.sql?raw'
 import instrumentHoldingSql from './010_instrument_holding.sql?raw'
 import dropFtsSql from './009_drop_fts.sql?raw'
 import { utcNowIso } from '../../lib/datetime'
@@ -32,6 +33,7 @@ const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 15, sql: appSettingSql },
   { version: 16, sql: transferDeletedAccountLabelSql },
   { version: 17, sql: categorySystemInvestmentsSql },
+  { version: 18, sql: transactionAffectsBalanceSql },
 ]
 
 function tableExists(db: Database, tableName: string): boolean {

@@ -92,6 +92,7 @@ export function transactionAmountTone(
   kind: TransactionKind,
   transferLeg: TransferLeg | null,
   rebalancingDirection: RebalancingDirection | null = null,
+  affectsBalance = true,
 ): TransactionAmountTone {
   if (kind === 'transfer') {
     return transferLeg === 'in' ? 'inflow' : 'outflow'
@@ -99,7 +100,10 @@ export function transactionAmountTone(
   if (kind === 'income') {
     return 'inflow'
   }
-  if (kind === 'expense' || kind === 'investment') {
+  if (kind === 'investment') {
+    return affectsBalance ? 'outflow' : 'inflow'
+  }
+  if (kind === 'expense') {
     return 'outflow'
   }
   if (kind === 'rebalancing') {
@@ -116,6 +120,7 @@ export function transactionAmountPrefix(
   kind: TransactionKind,
   transferLeg: TransferLeg | null = null,
   rebalancingDirection: RebalancingDirection | null = null,
+  affectsBalance = true,
 ): string {
   if (kind === 'transfer') {
     return transferLeg === 'in' ? '+' : '−'
@@ -125,6 +130,9 @@ export function transactionAmountPrefix(
   }
   if (kind === 'expense') {
     return '−'
+  }
+  if (kind === 'investment') {
+    return affectsBalance ? '−' : '+'
   }
   if (kind === 'rebalancing') {
     return rebalancingDirection === 'increase' ? '+' : '−'
@@ -136,6 +144,7 @@ type TransactionAmountDisplayProps = {
   kind: TransactionKind
   transferLeg: TransferLeg | null
   rebalancingDirection?: RebalancingDirection | null
+  affectsBalance?: boolean
   amountCents: number
   className?: string
 }
@@ -144,11 +153,22 @@ export function TransactionAmountDisplay({
   kind,
   transferLeg,
   rebalancingDirection = null,
+  affectsBalance = true,
   amountCents,
   className = '',
 }: TransactionAmountDisplayProps) {
-  const tone = transactionAmountTone(kind, transferLeg, rebalancingDirection)
-  const prefix = transactionAmountPrefix(kind, transferLeg, rebalancingDirection)
+  const tone = transactionAmountTone(
+    kind,
+    transferLeg,
+    rebalancingDirection,
+    affectsBalance,
+  )
+  const prefix = transactionAmountPrefix(
+    kind,
+    transferLeg,
+    rebalancingDirection,
+    affectsBalance,
+  )
   return (
     <span
       className={`font-medium tabular-nums ${transactionAmountClassName(tone)} ${className}`.trim()}

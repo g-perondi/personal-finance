@@ -514,6 +514,7 @@ export function TransactionPage() {
       accountId: form.accountId,
       fromAccountId: form.fromAccountId,
       toAccountId: form.toAccountId,
+      affectsBalance: editingOriginalTx?.affectsBalance,
     })
 
     const balanceForAccount = (accountId: string): number | null => {
@@ -719,6 +720,7 @@ export function TransactionPage() {
                         kind={tx.kind}
                         transferLeg={tx.transferLeg}
                         rebalancingDirection={tx.rebalancingDirection}
+                        affectsBalance={tx.affectsBalance}
                         amountCents={tx.amountCents}
                       />
                     </td>
@@ -995,6 +997,7 @@ export function TransactionPage() {
                     kind={deleteTarget.kind}
                     transferLeg={deleteTarget.transferLeg}
                     rebalancingDirection={deleteTarget.rebalancingDirection}
+                    affectsBalance={deleteTarget.affectsBalance}
                     amountCents={deleteTarget.amountCents}
                   />
                 </dd>

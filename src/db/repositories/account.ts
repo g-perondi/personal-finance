@@ -187,6 +187,7 @@ export function getAccountInvestedCentsForRomeCalendarYear(
     FROM ${TRANSACTION_TABLE} t
     WHERE t.account_id = ?
       AND t.kind = 'investment'
+      AND t.affects_balance != 0
       AND t.transaction_date >= ?
       AND t.transaction_date < ?
   `)

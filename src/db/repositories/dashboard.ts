@@ -32,8 +32,9 @@ export function getPeriodTotals(
         WHEN kind = 'expense'
           OR (kind = 'rebalancing' AND rebalancing_direction = 'decrease')
         THEN amount_cents ELSE 0 END), 0) AS expense_cents,
-      COALESCE(SUM(CASE WHEN kind = 'investment' THEN amount_cents ELSE 0 END), 0)
-        AS investment_cents
+      COALESCE(SUM(CASE
+        WHEN kind = 'investment' AND affects_balance != 0 THEN amount_cents
+        ELSE 0 END), 0) AS investment_cents
     FROM ${TRANSACTION_TABLE}
     WHERE transaction_date >= ? AND transaction_date < ?
   `)
@@ -324,6 +325,7 @@ export type LedgerRow = {
   kind: TransactionKind
   transferLeg: 'in' | 'out' | null
   rebalancingDirection: RebalancingDirection | null
+  affectsBalance: boolean
   amountCents: number
   transactionDate: string
   accountName: string
@@ -335,9 +337,9 @@ export type LedgerSign = 'in' | 'out'
 
 function signClause(sign: LedgerSign): string {
   if (sign === 'in') {
-    return `(t.kind = 'income' OR (t.kind = 'transfer' AND t.transfer_leg = 'in') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'increase'))`
+    return `(t.kind = 'income' OR (t.kind = 'transfer' AND t.transfer_leg = 'in') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'increase') OR (t.kind = 'investment' AND t.affects_balance = 0))`
   }
-  return `(t.kind IN ('expense', 'investment') OR (t.kind = 'transfer' AND t.transfer_leg = 'out') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'decrease'))`
+  return `(t.kind = 'expense' OR (t.kind = 'investment' AND t.affects_balance != 0) OR (t.kind = 'transfer' AND t.transfer_leg = 'out') OR (t.kind = 'rebalancing' AND t.rebalancing_direction = 'decrease'))`
 }
 
 export function countLedgerInPeriod(
@@ -391,6 +393,7 @@ export function listLedgerInPeriod(
       t.kind,
       t.transfer_leg,
       t.rebalancing_direction,
+      t.affects_balance,
       t.amount_cents,
       t.transaction_date,
       t.description,
@@ -418,6 +421,7 @@ export function listLedgerInPeriod(
         row.rebalancing_direction === 'decrease'
           ? row.rebalancing_direction
           : null,
+      affectsBalance: Number(row.affects_balance) !== 0,
       amountCents: Number(row.amount_cents),
       transactionDate: String(row.transaction_date),
       accountName: String(row.account_name),

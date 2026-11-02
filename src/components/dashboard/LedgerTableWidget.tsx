@@ -61,6 +61,7 @@ export function LedgerTableWidget({
                       kind={row.kind}
                       transferLeg={row.transferLeg}
                       rebalancingDirection={row.rebalancingDirection}
+                      affectsBalance={row.affectsBalance}
                       amountCents={row.amountCents}
                     />
                   </td>

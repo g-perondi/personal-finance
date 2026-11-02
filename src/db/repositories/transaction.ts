@@ -32,6 +32,13 @@ function mapRebalancingDirection(
   return null
 }
 
+function mapAffectsBalance(row: Record<string, unknown>): boolean {
+  if (row.affects_balance === undefined || row.affects_balance === null) {
+    return true
+  }
+  return Number(row.affects_balance) !== 0
+}
+
 function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
   return {
     id: String(row.id),
@@ -43,6 +50,7 @@ function mapTransactionRow(row: Record<string, unknown>): TransactionRecord {
     categoryId: row.category_id == null ? null : String(row.category_id),
     recurrenceKind: mapRecurrenceKind(row),
     rebalancingDirection: mapRebalancingDirection(row),
+    affectsBalance: mapAffectsBalance(row),
     transactionDate: normalizeStoredCalendarUtc(String(row.transaction_date)),
     description: row.description == null ? null : String(row.description),
     createdAt: toUtcIsoString(String(row.created_at)),
@@ -60,6 +68,7 @@ const LIST_SELECT = `
     t.category_id,
     t.recurrence_kind,
     t.rebalancing_direction,
+    t.affects_balance,
     t.transaction_date,
     t.description,
     t.created_at,
@@ -168,6 +177,8 @@ export type SimpleTransactionInput = {
   description?: string | null
   categoryId?: string | null
   recurrenceKind?: RecurrenceKind | null
+  /** Defaults to true. Investment rows may set false when cash is not spent on the account. */
+  affectsBalance?: boolean
 }
 
 export function createSimpleTransaction(
@@ -184,11 +195,13 @@ export function createSimpleTransaction(
     input.kind,
     input.recurrenceKind,
   )
+  const affectsBalance = input.affectsBalance !== false
   db.run(
     `INSERT INTO ${TRANSACTION_TABLE} (
       id, account_id, kind, amount_cents, transfer_leg, transfer_id,
-      category_id, recurrence_kind, rebalancing_direction, transaction_date, description, created_at
-    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, NULL, ?, ?, ?)`,
+      category_id, recurrence_kind, rebalancing_direction, affects_balance,
+      transaction_date, description, created_at
+    ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, NULL, ?, ?, ?, ?)`,
     [
       id,
       input.accountId,
@@ -196,6 +209,7 @@ export function createSimpleTransaction(
       input.amountCents,
       input.categoryId ?? null,
       recurrenceKind,
+      affectsBalance ? 1 : 0,
       transactionDate,
       input.description?.trim() || null,
       createdAt,
@@ -224,10 +238,12 @@ export function updateSimpleTransaction(
     input.kind,
     input.recurrenceKind,
   )
+  const affectsBalance =
+    input.affectsBalance === undefined ? existing.affectsBalance : input.affectsBalance
   db.run(
     `UPDATE ${TRANSACTION_TABLE}
      SET account_id = ?, kind = ?, amount_cents = ?, category_id = ?,
-         recurrence_kind = ?, transaction_date = ?, description = ?
+         recurrence_kind = ?, affects_balance = ?, transaction_date = ?, description = ?
      WHERE id = ?`,
     [
       input.accountId,
@@ -235,6 +251,7 @@ export function updateSimpleTransaction(
       input.amountCents,
       input.categoryId ?? null,
       recurrenceKind,
+      affectsBalance ? 1 : 0,
       transactionDate,
       input.description?.trim() || null,
       id,

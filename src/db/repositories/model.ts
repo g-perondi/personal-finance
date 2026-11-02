@@ -51,6 +51,11 @@ export type TransactionRecord = {
   categoryId: string | null
   recurrenceKind: RecurrenceKind | null
   rebalancingDirection: RebalancingDirection | null
+  /**
+   * When false, the row is visible in the ledger but does not change account
+   * cash (e.g. investment funded outside the account).
+   */
+  affectsBalance: boolean
   /** UTC ISO 8601 (start of calendar day in Europe/Rome) */
   transactionDate: UtcIsoString
   description: string | null

@@ -379,7 +379,11 @@ export type CreateOpeningHoldingInput = {
   openingDate: string
   quantity: number
   priceCentsPerUnit: number
-  /** When true, posts an `investment` transaction on the account (cashflow + balance). */
+  /**
+   * When true (default), the linked investment transaction deducts from account cash.
+   * When false, the transaction is still posted (visible in the ledger) but does not
+   * change the account balance.
+   */
   recordInvestmentTransaction?: boolean
 }
 
@@ -412,19 +416,18 @@ export function createOpeningHolding(
     totalCostCents,
   )
 
-  let transactionId: string | null = null
-  if (input.recordInvestmentTransaction) {
-    const tx = createSimpleTransaction(db, {
-      accountId: input.accountId,
-      kind: 'investment',
-      amountCents: totalCostCents,
-      transactionDate: input.openingDate,
-      description: instrument.name,
-      categoryId: getInvestmentsCategoryId(db),
-      recurrenceKind: 'variable',
-    })
-    transactionId = tx.id
-  }
+  const deductFromBalance = input.recordInvestmentTransaction !== false
+  const tx = createSimpleTransaction(db, {
+    accountId: input.accountId,
+    kind: 'investment',
+    amountCents: totalCostCents,
+    transactionDate: input.openingDate,
+    description: instrument.name,
+    categoryId: getInvestmentsCategoryId(db),
+    recurrenceKind: 'variable',
+    affectsBalance: deductFromBalance,
+  })
+  const transactionId = tx.id
 
   const purchaseId = newId()
   const createdAt = utcNowIso()
@@ -455,7 +458,10 @@ export type RecordHoldingPurchaseInput = {
   amountCents: number
   priceCentsPerUnit: number
   description?: string | null
-  /** When true (default), posts an `investment` transaction on the account (cashflow). */
+  /**
+   * When true (default), the linked investment transaction deducts from account cash.
+   * When false, the transaction is still posted but does not change the account balance.
+   */
   recordInvestmentTransaction?: boolean
 }
 
@@ -490,20 +496,18 @@ export function recordHoldingPurchase(
   }
 
   const purchaseDate = parseCalendarDateForStorage(input.purchaseDate)
-  const recordLedger = input.recordInvestmentTransaction !== false
-  let transactionId: string | null = null
-  if (recordLedger) {
-    const tx = createSimpleTransaction(db, {
-      accountId: input.accountId,
-      kind: 'investment',
-      amountCents: input.amountCents,
-      transactionDate: input.purchaseDate,
-      description: input.description?.trim() || instrument.name,
-      categoryId: getInvestmentsCategoryId(db),
-      recurrenceKind: 'variable',
-    })
-    transactionId = tx.id
-  }
+  const deductFromBalance = input.recordInvestmentTransaction !== false
+  const tx = createSimpleTransaction(db, {
+    accountId: input.accountId,
+    kind: 'investment',
+    amountCents: input.amountCents,
+    transactionDate: input.purchaseDate,
+    description: input.description?.trim() || instrument.name,
+    categoryId: getInvestmentsCategoryId(db),
+    recurrenceKind: 'variable',
+    affectsBalance: deductFromBalance,
+  })
+  const transactionId = tx.id
 
   const purchaseId = newId()
   db.run(

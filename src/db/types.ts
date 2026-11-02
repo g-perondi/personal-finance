@@ -30,7 +30,11 @@ export function signedAmountCents(
   amountCents: number,
   transferLeg: TransferLeg | null,
   rebalancingDirection: RebalancingDirection | null = null,
+  affectsBalance = true,
 ): number {
+  if (!affectsBalance) {
+    return 0
+  }
   switch (kind) {
     case 'income':
       return amountCents
@@ -61,6 +65,7 @@ export function signedAmountCents(
 /** SQL CASE fragment: alias `t` for transaction row. */
 export const TRANSACTION_SIGNED_DELTA_SQL = `
   CASE
+    WHEN t.affects_balance = 0 THEN 0
     WHEN t.kind = 'income' THEN t.amount_cents
     WHEN t.kind IN ('expense', 'investment') THEN -t.amount_cents
     WHEN t.kind = 'transfer' AND t.transfer_leg = 'in' THEN t.amount_cents

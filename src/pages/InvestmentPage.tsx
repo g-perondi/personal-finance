@@ -201,7 +201,7 @@ type OpeningForm = {
   openingDate: string
   quantity: string
   avgCostPerUnit: string
-  /** When true, posts an investment transaction on the account (cashflow). */
+  /** When true, the ledger investment deducts from account cash. */
   recordInvestmentTransaction: boolean
 }
 
@@ -217,7 +217,7 @@ type PurchaseForm = {
   purchaseDate: string
   amount: string
   navPerUnit: string
-  /** When true, posts an investment transaction on the account (cashflow). */
+  /** When true, the ledger investment deducts from account cash. */
   recordInvestmentTransaction: boolean
 }
 
@@ -1081,8 +1081,8 @@ export function InvestmentPage() {
             <span>
               Deduct from account balance
               <span className="mt-0.5 block text-xs text-slate-500">
-                Turn off for assets you already hold (portfolio only, no account
-                cashflow).
+                Turn off for assets you already hold: still listed in Transactions with
+                a + amount, without changing account cash.
               </span>
             </span>
           </label>
@@ -1226,8 +1226,8 @@ export function InvestmentPage() {
                 <span>
                   Deduct from account balance
                   <span className="mt-0.5 block text-xs text-slate-500">
-                    Turn off for external inflows (e.g. saveback) that increase holdings
-                    without spending cash on the account.
+                    Turn off for external inflows (e.g. saveback): listed in
+                    Transactions with a + amount, without spending account cash.
                   </span>
                 </span>
               </label>

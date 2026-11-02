@@ -114,7 +114,7 @@ Repository: [`repositories/dashboard.ts`](repositories/dashboard.ts).
 
 ## Portfolio holdings (migrations 10 + 14)
 
-Portfolio positions are separate from the cash ledger: **`instrument`** (`asset_kind`: `etf` | `equity` | `crypto`, optional ISIN, `quote_symbol`, name), **`holding`** (one row per account + instrument: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; optional `transaction_id` for buys that also post an **`investment`** transaction).
+Portfolio positions are separate from the cash ledger: **`instrument`** (`asset_kind`: `etf` | `equity` | `crypto`, optional ISIN, `quote_symbol`, name), **`holding`** (one row per account + instrument: `quantity`, `total_cost_cents`), **`holding_purchase`** (audit line; linked `transaction_id` for the matching **`investment`** ledger row).
 
 | `asset_kind` | Lookup                     | `quote_symbol`                | Live price (EUR) |
 | ------------ | -------------------------- | ----------------------------- | ---------------- |
@@ -125,8 +125,8 @@ Portfolio positions are separate from the cash ledger: **`instrument`** (`asset_
 Migration **14** adds `instrument.asset_kind` with default **`etf`** for existing rows (backup restore from pre-14 builds upgrades via `runMigrations()`).
 
 - **Weighted average cost:** display avg = `total_cost_cents / quantity`; new buys add amount to cost and units from `amount_cents / price_cents_per_unit`.
-- **Opening seed:** `createOpeningHolding` — `openingDate`, `quantity`, and average **`priceCentsPerUnit`** (cost basis = round(qty × price)); optional **`recordInvestmentTransaction`** (default on in UI) posts a matching **`investment`** row and links `holding_purchase.transaction_id`. Uncheck **Deduct from account balance** for assets you already hold (portfolio only).
-- **New purchase:** `recordHoldingPurchase` — updates holding, inserts purchase, inserts matching **`transaction`** (`kind = investment`) on the same account/date/amount.
+- **Opening seed:** `createOpeningHolding` — `openingDate`, `quantity`, and average **`priceCentsPerUnit`** (cost basis = round(qty × price)); always posts a matching **`investment`** row. Uncheck **Deduct from account balance** to set `affects_balance = 0` (visible in the ledger with a `+` amount, cash unchanged).
+- **New purchase:** `recordHoldingPurchase` — updates holding, inserts purchase, inserts matching **`transaction`** (`kind = investment`) on the same account/date/amount. **Deduct from account balance** maps to `affects_balance` (`1` → cash outflow `−`, `0` → ledger `+` without cash change).
 - **Delete investment transaction:** `deleteSimpleTransaction` on a linked row runs `reverseHoldingPurchaseForTransaction` first (removes the purchase line and reduces or deletes the holding). Unlinked manual **`investment`** rows only remove the ledger line.
 - **Recent purchases (Investments UI):** `updateHoldingPurchase` / `deleteHoldingPurchase` keep `holding`, `holding_purchase`, and linked **`investment`** transactions in sync (delete removes the ledger row when `transaction_id` is set).
 - **Quotes:** [`src/lib/market-quotes/`](../lib/market-quotes/) fetches delayed/unofficial prices in the browser (Yahoo Finance via CORS proxy + SQLite **`instrument_quote_cache`**). All asset kinds use the same Yahoo chart path with conversion to EUR when needed.

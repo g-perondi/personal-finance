@@ -13,6 +13,7 @@ export function transactionSignedDelta(tx: TransactionRecord): number {
     tx.amountCents,
     tx.transferLeg,
     tx.rebalancingDirection,
+    tx.affectsBalance,
   )
 }
 
@@ -27,8 +28,9 @@ export function projectBalanceAfterEntry(
 export function signedDeltaForSimpleEntry(
   kind: Extract<TransactionKind, 'income' | 'expense' | 'investment'>,
   amountCents: number,
+  affectsBalance = true,
 ): number {
-  return signedAmountCents(kind, amountCents, null, null)
+  return signedAmountCents(kind, amountCents, null, null, affectsBalance)
 }
 
 export function signedDeltaForTransferLeg(
@@ -44,6 +46,8 @@ export type EntryFormDeltaInput = {
   accountId: string
   fromAccountId: string
   toAccountId: string
+  /** Preserved when editing investment rows that do not move cash. */
+  affectsBalance?: boolean
 }
 
 export function computeEntryPreviewDeltas(input: EntryFormDeltaInput): {
@@ -86,7 +90,11 @@ export function computeEntryPreviewDeltas(input: EntryFormDeltaInput): {
   }
   return {
     primaryAccountId: input.accountId,
-    primaryDelta: signedDeltaForSimpleEntry(input.kind, input.amountCents),
+    primaryDelta: signedDeltaForSimpleEntry(
+      input.kind,
+      input.amountCents,
+      input.affectsBalance,
+    ),
     fromDelta: null,
     toDelta: null,
   }
