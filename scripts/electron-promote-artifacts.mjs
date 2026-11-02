@@ -8,6 +8,36 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const releaseDir = path.join(root, 'release')
 const artifactsDir = path.join(root, 'artifacts')
 
+/**
+ * Prefer win-unpacked; otherwise mac / mac-* from electron-builder.
+ * @param {import('node:fs').Dirent[]} releaseEntries
+ * @returns {string}
+ */
+function findUnpackedDir(releaseEntries) {
+  const win = releaseEntries.find(
+    (entry) => entry.isDirectory() && entry.name === 'win-unpacked',
+  )
+  if (win) {
+    return path.join(releaseDir, win.name)
+  }
+
+  const macDirs = releaseEntries
+    .filter(
+      (entry) =>
+        entry.isDirectory() && (entry.name === 'mac' || entry.name.startsWith('mac-')),
+    )
+    .map((entry) => entry.name)
+    .toSorted()
+
+  if (macDirs.length > 0) {
+    return path.join(releaseDir, macDirs[0])
+  }
+
+  throw new Error(
+    'No unpacked Electron app found in release/ (expected win-unpacked or mac*). Run electron-builder first.',
+  )
+}
+
 const releaseEntries = await readdir(releaseDir, { withFileTypes: true })
 const portableExes = releaseEntries.filter(
   (entry) => entry.isFile() && entry.name.endsWith('.exe'),
@@ -23,10 +53,10 @@ if (toCopy.length === 0) {
   process.exit(1)
 }
 
-const winUnpacked = path.join(releaseDir, 'win-unpacked')
+const unpackedDir = findUnpackedDir(releaseEntries)
 try {
-  await validateElectronUnpacked(winUnpacked)
-  console.log('Electron pack validation OK')
+  await validateElectronUnpacked(unpackedDir)
+  console.log(`Electron pack validation OK (${path.relative(root, unpackedDir)})`)
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   process.exit(1)

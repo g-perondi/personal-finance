@@ -1,19 +1,72 @@
-import { readFile } from 'node:fs/promises'
+import { access, readFile, readdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * @param {string} unpackedDir absolute path to win-unpacked (or equivalent)
+ * Resolve app.asar for Windows/Linux unpacked dirs or a macOS .app / mac-* folder.
+ * @param {string} unpackedDir
+ * @returns {Promise<string>}
+ */
+export async function resolveAsarPath(unpackedDir) {
+  const candidates = [
+    path.join(unpackedDir, 'resources', 'app.asar'),
+    path.join(unpackedDir, 'Contents', 'Resources', 'app.asar'),
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      await access(candidate)
+      return candidate
+    } catch {
+      // try next
+    }
+  }
+
+  let entries = []
+  try {
+    entries = await readdir(unpackedDir, { withFileTypes: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Cannot read unpacked dir ${unpackedDir}: ${message}`, {
+      cause: error,
+    })
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.endsWith('.app')) {
+      continue
+    }
+    const macAsar = path.join(
+      unpackedDir,
+      entry.name,
+      'Contents',
+      'Resources',
+      'app.asar',
+    )
+    try {
+      await access(macAsar)
+      return macAsar
+    } catch {
+      // try next .app
+    }
+  }
+
+  throw new Error(
+    `ENOENT: no such file or directory, open '${path.join(unpackedDir, 'resources', 'app.asar')}' (also checked macOS .app Contents/Resources)`,
+  )
+}
+
+/**
+ * @param {string} unpackedDir absolute path to win-unpacked, mac-*, or .app
  */
 export async function validateElectronUnpacked(unpackedDir) {
-  const asarPath = path.join(unpackedDir, 'resources', 'app.asar')
+  const asarPath = await resolveAsarPath(unpackedDir)
   const errors = []
 
   let asarExtracted = false
   const { extractAll } = await import('@electron/asar')
   const tempExtract = path.join(unpackedDir, '.validate-asar-extract')
   try {
-    const { rm } = await import('node:fs/promises')
     await rm(tempExtract, { recursive: true, force: true })
     extractAll(asarPath, tempExtract)
     asarExtracted = true
@@ -60,7 +113,6 @@ export async function validateElectronUnpacked(unpackedDir) {
     }
   } finally {
     if (asarExtracted) {
-      const { rm } = await import('node:fs/promises')
       await rm(tempExtract, { recursive: true, force: true }).catch(() => {})
     }
   }
@@ -79,7 +131,7 @@ if (
   const unpacked = process.argv[2]
   if (!unpacked) {
     console.error(
-      'Usage: node scripts/validate-electron-pack.mjs <path-to-win-unpacked>',
+      'Usage: node scripts/validate-electron-pack.mjs <path-to-unpacked-or-app>',
     )
     process.exit(1)
   }
